@@ -1,9 +1,10 @@
 --=========================================================
 -- TRIXADE 50T MANAGER
--- GUI + ANTI-AFK + CASH TRACKER
+-- STRUTTURA PULITA
 --=========================================================
 
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -16,8 +17,42 @@ local TARGET_LOOPS = 250
 local SPAWNER_NAME = "50000000000000"
 
 --=========================================================
--- LOGICA RACCOLTA MONETE
--- SOLO LETTURA
+-- CARTELLA SPAWNER
+--=========================================================
+
+local spawnersFolder =
+    Workspace:WaitForChild("CoinSpawners")
+
+--=========================================================
+-- LOGICA DI RACCOLTA MONETE
+--=========================================================
+
+local spawnerInstances = {}
+
+local children =
+    spawnersFolder:GetChildren()
+
+for i = 1, #children do
+
+    local child = children[i]
+
+    if child.Name == SPAWNER_NAME
+    and child:IsA("BasePart") then
+
+        table.insert(
+            spawnerInstances,
+            child
+        )
+    end
+end
+
+print(
+    "[CORE] Spawner 50T trovati:",
+    #spawnerInstances
+)
+
+--=========================================================
+-- ROUTINE SINGOLO SPAWNER
 --=========================================================
 
 local spawnerInstances = {}
@@ -62,6 +97,57 @@ end
 
 
 --=========================================================
+-- LOOP AUTOFARM
+--=========================================================
+
+local farmingThreadAttivo = false
+
+local function AvviaLoopFarming()
+
+    -- Evita thread doppi premendo START molte volte
+    if farmingThreadAttivo then
+        return
+    end
+
+    farmingThreadAttivo = true
+
+    task.spawn(function()
+
+        print("[CORE] Loop farming avviato.")
+
+        while _G.FarmingAttivo do
+
+            for idx = 1, #spawnerInstances do
+
+                if not _G.FarmingAttivo then
+                    break
+                end
+
+                local target =
+                    spawnerInstances[idx]
+
+                print(
+                    "[CORE] Target 50T #"
+                    .. tostring(idx)
+                )
+
+                runRoutine(target)
+
+                task.wait(0.3)
+            end
+
+            if _G.FarmingAttivo then
+                task.wait(1.5)
+            end
+        end
+
+        farmingThreadAttivo = false
+
+        print("[CORE] Loop farming terminato.")
+    end)
+end
+
+--=========================================================
 -- ANTI-AFK
 --=========================================================
 
@@ -70,31 +156,31 @@ local idleConnection = nil
 
 local function InizializzaAntiAFK()
 
-    local ok, err = pcall(function()
+    local ok, err =
+        pcall(function()
 
-        local VirtualUser =
-            game:GetService("VirtualUser")
+            local VirtualUser =
+                game:GetService("VirtualUser")
 
-        idleConnection =
-            lPlayer.Idled:Connect(function()
+            idleConnection =
+                lPlayer.Idled:Connect(function()
 
-                if not AntiAfkAttivo then
-                    return
-                end
+                    if not AntiAfkAttivo then
+                        return
+                    end
 
-                pcall(function()
+                    pcall(function()
 
-                    VirtualUser:CaptureController()
+                        VirtualUser:CaptureController()
 
-                    VirtualUser:ClickButton2(
-                        Vector2.new(0, 0)
-                    )
+                        VirtualUser:ClickButton2(
+                            Vector2.new(0, 0)
+                        )
+                    end)
 
+                    print("[ANTI-AFK] Input simulato.")
                 end)
-
-                print("[ANTI-AFK] Input simulato.")
-            end)
-    end)
+        end)
 
     if ok then
         print("[ANTI-AFK] Sistema attivo.")
@@ -107,191 +193,71 @@ local function InizializzaAntiAFK()
 end
 
 --=========================================================
--- ROUTINE FARMING
---
--- QUI VA LA PARTE CHE ESEGUE UNA SINGOLA ROUTINE
---=========================================================
-
-local function runRoutine(targetSpawner)
-
-    if not targetSpawner then
-        return
-    end
-
-    if not _G.FarmingAttivo then
-        return
-    end
-
-    --=====================================================
-    -- FARMING REALE: INSERIMENTO MANUALE
-    --=====================================================
-    local FarmButton = Instance.new("TextButton")
-    FarmButton.Name = "FarmButton"
-    FarmButton.Size = UDim2.new(0, 180, 0, 40)
-    FarmButton.Position = UDim2.new(0.5, -90, 0, 50)
-    FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    FarmButton.Text = "FARMING: DISATTIVATO"
-    FarmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    FarmButton.TextSize = 14
-    FarmButton.Font = Enum.Font.SourceSansBold
-    FarmButton.Parent = MainFrame
-
-    local ButtonCorner = Instance.new("UICorner")
-    ButtonCorner.CornerRadius = UDim.new(0, 8)
-    ButtonCorner.Parent = FarmButton
-
---=========================================================
--- LOOP FARMING
---=========================================================
-
-local farmingThreadAttivo = false
-
-local function AvviaLoopFarming()
-
-    -- Evita di creare 20 thread premendo START più volte
-    if farmingThreadAttivo then
-        return
-    end
-
-    farmingThreadAttivo = true
-
-    task.spawn(function()
-
-        print("[CORE] Loop avviato.")
-
-        while _G.FarmingAttivo do
-
-            for index, instance
-                in ipairs(spawnerInstances)
-            do
-
-                if not _G.FarmingAttivo then
-                    break
-                end
-
-                print(
-                    "[CORE] Target 50T #"
-                    .. tostring(index)
-                )
-
-                runRoutine(instance)
-
-                task.wait(0.3)
-            end
-
-            if _G.FarmingAttivo then
-                task.wait(1.5)
-            end
-        end
-
-        farmingThreadAttivo = false
-
-        print("[CORE] Loop terminato.")
-    end)
-end
-
---=========================================================
 -- FORMATTAZIONE NUMERI
 --=========================================================
 
-local function formatNumber(number)
+local function formatNumber(n)
 
-    number = tonumber(number) or 0
+    n = tonumber(n) or 0
 
     local sign = ""
 
-    if number < 0 then
+    if n < 0 then
         sign = "-"
-        number = math.abs(number)
+        n = math.abs(n)
     end
 
-    if number >= 1e24 then
-        return sign
-            .. string.format(
-                "%.2fSp",
-                number / 1e24
-            )
+    if n >= 1e24 then
+        return sign .. string.format("%.2fSp", n / 1e24)
 
-    elseif number >= 1e21 then
-        return sign
-            .. string.format(
-                "%.2fSx",
-                number / 1e21
-            )
+    elseif n >= 1e21 then
+        return sign .. string.format("%.2fSx", n / 1e21)
 
-    elseif number >= 1e18 then
-        return sign
-            .. string.format(
-                "%.2fQi",
-                number / 1e18
-            )
+    elseif n >= 1e18 then
+        return sign .. string.format("%.2fQi", n / 1e18)
 
-    elseif number >= 1e15 then
-        return sign
-            .. string.format(
-                "%.2fQa",
-                number / 1e15
-            )
+    elseif n >= 1e15 then
+        return sign .. string.format("%.2fQa", n / 1e15)
 
-    elseif number >= 1e12 then
-        return sign
-            .. string.format(
-                "%.2fT",
-                number / 1e12
-            )
+    elseif n >= 1e12 then
+        return sign .. string.format("%.2fT", n / 1e12)
 
-    elseif number >= 1e9 then
-        return sign
-            .. string.format(
-                "%.2fB",
-                number / 1e9
-            )
+    elseif n >= 1e9 then
+        return sign .. string.format("%.2fB", n / 1e9)
 
-    elseif number >= 1e6 then
-        return sign
-            .. string.format(
-                "%.2fM",
-                number / 1e6
-            )
+    elseif n >= 1e6 then
+        return sign .. string.format("%.2fM", n / 1e6)
 
-    elseif number >= 1e3 then
-        return sign
-            .. string.format(
-                "%.2fK",
-                number / 1e3
-            )
+    elseif n >= 1e3 then
+        return sign .. string.format("%.2fK", n / 1e3)
     end
 
-    return sign
-        .. tostring(
-            math.floor(number)
-        )
+    return sign .. tostring(math.floor(n))
 end
 
-local function signedNumber(number)
+local function signedNumber(n)
 
-    if number >= 0 then
-        return "+"
-            .. formatNumber(number)
+    if n >= 0 then
+        return "+" .. formatNumber(n)
     end
 
-    return formatNumber(number)
+    return formatNumber(n)
 end
 
 --=========================================================
--- GUI
+-- CREAZIONE INTERFACCIA GRAFICA (GUI)
 --=========================================================
 
 local function CreaInterfaccia()
 
-    local GUI_NAME =
+    local screenName =
         "SuperheroSim_50T_Gui"
 
-    local oldGui =
-        pGui:FindFirstChild(GUI_NAME)
+    local vecchioScreen =
+        pGui:FindFirstChild(screenName)
 
-    if oldGui then
-        oldGui:Destroy()
+    if vecchioScreen then
+        vecchioScreen:Destroy()
     end
 
     --=====================================================
@@ -301,18 +267,24 @@ local function CreaInterfaccia()
     local ScreenGui =
         Instance.new("ScreenGui")
 
-    ScreenGui.Name = GUI_NAME
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.Parent = pGui
+    ScreenGui.Name =
+        screenName
+
+    ScreenGui.ResetOnSpawn =
+        false
+
+    ScreenGui.Parent =
+        pGui
 
     --=====================================================
-    -- MAIN FRAME
+    -- FRAME PRINCIPALE
     --=====================================================
 
     local MainFrame =
         Instance.new("Frame")
 
-    MainFrame.Name = "MainFrame"
+    MainFrame.Name =
+        "MainFrame"
 
     MainFrame.Size =
         UDim2.new(
@@ -345,13 +317,14 @@ local function CreaInterfaccia()
         MainFrame
 
     --=====================================================
-    -- TITLE BAR
+    -- TITOLO GUI
     --=====================================================
 
     local Title =
         Instance.new("TextLabel")
 
-    Title.Name = "Title"
+    Title.Name =
+        "Title"
 
     Title.Size =
         UDim2.new(
@@ -375,10 +348,7 @@ local function CreaInterfaccia()
         )
 
     Title.TextSize = 14
-
-    Title.Font =
-        Enum.Font.SourceSansBold
-
+    Title.Font = Enum.Font.SourceSansBold
     Title.Active = true
     Title.Parent = MainFrame
 
@@ -388,10 +358,12 @@ local function CreaInterfaccia()
     TitleCorner.CornerRadius =
         UDim.new(0, 10)
 
-    TitleCorner.Parent = Title
+    TitleCorner.Parent =
+        Title
 
     --=====================================================
-    -- DRAG PC + TOUCH
+    -- Sistema di trascinamento touch nativo per Mobile
+    -- (Rimpiazza .Draggable rotto)
     --=====================================================
 
     local dragging = false
@@ -399,52 +371,44 @@ local function CreaInterfaccia()
     local dragStart = nil
     local startPos = nil
 
-    Title.InputBegan:Connect(
-        function(input)
+    Title.InputBegan:Connect(function(input)
 
-            if
-                input.UserInputType
-                    == Enum.UserInputType.MouseButton1
-                or
-                input.UserInputType
-                    == Enum.UserInputType.Touch
-            then
+        if
+            input.UserInputType
+                == Enum.UserInputType.MouseButton1
+            or
+            input.UserInputType
+                == Enum.UserInputType.Touch
+        then
 
-                dragging = true
-                dragStart = input.Position
-                startPos = MainFrame.Position
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
 
-                input.Changed:Connect(
-                    function()
+            input.Changed:Connect(function()
 
-                        if
-                            input.UserInputState
-                            == Enum.UserInputState.End
-                        then
-
-                            dragging = false
-                        end
-                    end
-                )
-            end
+                if
+                    input.UserInputState
+                    == Enum.UserInputState.End
+                then
+                    dragging = false
+                end
+            end)
         end
-    )
+    end)
 
-    Title.InputChanged:Connect(
-        function(input)
+    Title.InputChanged:Connect(function(input)
 
-            if
-                input.UserInputType
-                    == Enum.UserInputType.MouseMovement
-                or
-                input.UserInputType
-                    == Enum.UserInputType.Touch
-            then
-
-                dragInput = input
-            end
+        if
+            input.UserInputType
+                == Enum.UserInputType.MouseMovement
+            or
+            input.UserInputType
+                == Enum.UserInputType.Touch
+        then
+            dragInput = input
         end
-    )
+    end)
 
     local dragConnection =
         UserInputService.InputChanged:Connect(
@@ -457,24 +421,21 @@ local function CreaInterfaccia()
                 then
 
                     local delta =
-                        input.Position
-                        - dragStart
+                        input.Position - dragStart
 
                     MainFrame.Position =
                         UDim2.new(
                             startPos.X.Scale,
-                            startPos.X.Offset
-                                + delta.X,
+                            startPos.X.Offset + delta.X,
                             startPos.Y.Scale,
-                            startPos.Y.Offset
-                                + delta.Y
+                            startPos.Y.Offset + delta.Y
                         )
                 end
             end
         )
 
     --=====================================================
-    -- START / STOP FARMING
+    -- Pulsante START / STOP Farming
     --=====================================================
 
     local FarmButton =
@@ -509,12 +470,8 @@ local function CreaInterfaccia()
         )
 
     FarmButton.TextSize = 14
-
-    FarmButton.Font =
-        Enum.Font.SourceSansBold
-
-    FarmButton.Parent =
-        MainFrame
+    FarmButton.Font = Enum.Font.SourceSansBold
+    FarmButton.Parent = MainFrame
 
     local FarmCorner =
         Instance.new("UICorner")
@@ -526,42 +483,40 @@ local function CreaInterfaccia()
         FarmButton
 
     --=====================================================
-    -- QUESTO COLLEGA IL BOTTONE AL LOOP
+    -- COLLEGAMENTO START / STOP
     --=====================================================
 
-    FarmButton.MouseButton1Click:Connect(
-        function()
+    FarmButton.MouseButton1Click:Connect(function()
 
-            _G.FarmingAttivo =
-                not _G.FarmingAttivo
+        _G.FarmingAttivo =
+            not _G.FarmingAttivo
 
-            if _G.FarmingAttivo then
+        if _G.FarmingAttivo then
 
-                FarmButton.BackgroundColor3 =
-                    Color3.fromRGB(
-                        50, 180, 50
-                    )
+            FarmButton.BackgroundColor3 =
+                Color3.fromRGB(
+                    50, 180, 50
+                )
 
-                FarmButton.Text =
-                    "FARMING: ATTIVO"
+            FarmButton.Text =
+                "FARMING: ATTIVO"
 
-                AvviaLoopFarming()
+            AvviaLoopFarming()
 
-            else
+        else
 
-                FarmButton.BackgroundColor3 =
-                    Color3.fromRGB(
-                        200, 50, 50
-                    )
+            FarmButton.BackgroundColor3 =
+                Color3.fromRGB(
+                    200, 50, 50
+                )
 
-                FarmButton.Text =
-                    "FARMING: DISATTIVATO"
-            end
+            FarmButton.Text =
+                "FARMING: DISATTIVATO"
         end
-    )
+    end)
 
     --=====================================================
-    -- ANTI AFK BUTTON
+    -- ANTI-AFK BUTTON
     --=====================================================
 
     local AfkButton =
@@ -596,12 +551,8 @@ local function CreaInterfaccia()
         )
 
     AfkButton.TextSize = 12
-
-    AfkButton.Font =
-        Enum.Font.SourceSansBold
-
-    AfkButton.Parent =
-        MainFrame
+    AfkButton.Font = Enum.Font.SourceSansBold
+    AfkButton.Parent = MainFrame
 
     local AfkCorner =
         Instance.new("UICorner")
@@ -612,34 +563,32 @@ local function CreaInterfaccia()
     AfkCorner.Parent =
         AfkButton
 
-    AfkButton.MouseButton1Click:Connect(
-        function()
+    AfkButton.MouseButton1Click:Connect(function()
 
-            AntiAfkAttivo =
-                not AntiAfkAttivo
+        AntiAfkAttivo =
+            not AntiAfkAttivo
 
-            if AntiAfkAttivo then
+        if AntiAfkAttivo then
 
-                AfkButton.Text =
-                    "ANTI-AFK: ATTIVO"
+            AfkButton.Text =
+                "ANTI-AFK: ATTIVO"
 
-                AfkButton.BackgroundColor3 =
-                    Color3.fromRGB(
-                        45, 110, 55
-                    )
+            AfkButton.BackgroundColor3 =
+                Color3.fromRGB(
+                    45, 110, 55
+                )
 
-            else
+        else
 
-                AfkButton.Text =
-                    "ANTI-AFK: DISATTIVATO"
+            AfkButton.Text =
+                "ANTI-AFK: DISATTIVATO"
 
-                AfkButton.BackgroundColor3 =
-                    Color3.fromRGB(
-                        130, 60, 60
-                    )
-            end
+            AfkButton.BackgroundColor3 =
+                Color3.fromRGB(
+                    130, 60, 60
+                )
         end
-    )
+    end)
 
     --=====================================================
     -- LABEL HELPER
@@ -674,7 +623,6 @@ local function CreaInterfaccia()
             )
 
         label.BorderSizePixel = 0
-
         label.Text = text
 
         label.TextColor3 =
@@ -683,12 +631,8 @@ local function CreaInterfaccia()
             )
 
         label.TextSize = 12
-
-        label.Font =
-            Enum.Font.SourceSansBold
-
-        label.Parent =
-            MainFrame
+        label.Font = Enum.Font.SourceSansBold
+        label.Parent = MainFrame
 
         local corner =
             Instance.new("UICorner")
@@ -701,6 +645,10 @@ local function CreaInterfaccia()
 
         return label
     end
+
+    --=====================================================
+    -- CONTATORI
+    --=====================================================
 
     local CurrentCash =
         makeLabel(
@@ -735,9 +683,7 @@ local function CreaInterfaccia()
             "SpawnerInfo",
             279,
             "SPAWNER 50T: "
-            .. tostring(
-                #spawnerInstances
-            )
+                .. tostring(#spawnerInstances)
         )
 
     local LoopInfo =
@@ -745,9 +691,7 @@ local function CreaInterfaccia()
             "LoopInfo",
             313,
             "LOOPS CONFIG: "
-            .. tostring(
-                TARGET_LOOPS
-            )
+                .. tostring(TARGET_LOOPS)
         )
 
     --=====================================================
@@ -765,10 +709,7 @@ local function CreaInterfaccia()
             )
 
         if not leaderstats then
-
-            CurrentCash.Text =
-                "CASH: N/D"
-
+            CurrentCash.Text = "CASH: N/D"
             return
         end
 
@@ -779,16 +720,12 @@ local function CreaInterfaccia()
             )
 
         if not cash then
-
-            CurrentCash.Text =
-                "CASH: N/D"
-
+            CurrentCash.Text = "CASH: N/D"
             return
         end
 
         local sessionStart =
-            tonumber(cash.Value)
-            or 0
+            tonumber(cash.Value) or 0
 
         local previousCash =
             sessionStart
@@ -816,8 +753,7 @@ local function CreaInterfaccia()
                 or previousCash
 
             local secondDelta =
-                current
-                - previousCash
+                current - previousCash
 
             previousCash =
                 current
@@ -833,9 +769,7 @@ local function CreaInterfaccia()
             while
                 #history > 1
                 and
-                now
-                    - history[1].time
-                    > 60
+                now - history[1].time > 60
             do
 
                 table.remove(
@@ -854,32 +788,24 @@ local function CreaInterfaccia()
 
             CurrentCash.Text =
                 "CASH: "
-                .. formatNumber(
-                    current
-                )
+                .. formatNumber(current)
 
             GainSecond.Text =
                 "GUADAGNO / SEC: "
-                .. signedNumber(
-                    secondDelta
-                )
+                .. signedNumber(secondDelta)
 
             GainMinute.Text =
                 "ULTIMI 60 SEC: "
-                .. signedNumber(
-                    minuteDelta
-                )
+                .. signedNumber(minuteDelta)
 
             GainSession.Text =
                 "SESSIONE: "
-                .. signedNumber(
-                    sessionDelta
-                )
+                .. signedNumber(sessionDelta)
         end
     end)
 
     --=====================================================
-    -- MINIMIZE
+    -- MINIMIZZA
     --=====================================================
 
     local minimized = false
@@ -915,10 +841,7 @@ local function CreaInterfaccia()
         )
 
     MinButton.TextSize = 18
-
-    MinButton.Font =
-        Enum.Font.SourceSansBold
-
+    MinButton.Font = Enum.Font.SourceSansBold
     MinButton.ZIndex = 10
     MinButton.Parent = MainFrame
 
@@ -932,7 +855,7 @@ local function CreaInterfaccia()
         MinButton
 
     --=====================================================
-    -- CLOSE
+    -- CHIUDI
     --=====================================================
 
     local CloseButton =
@@ -966,10 +889,7 @@ local function CreaInterfaccia()
         )
 
     CloseButton.TextSize = 18
-
-    CloseButton.Font =
-        Enum.Font.SourceSansBold
-
+    CloseButton.Font = Enum.Font.SourceSansBold
     CloseButton.ZIndex = 10
     CloseButton.Parent = MainFrame
 
@@ -983,7 +903,7 @@ local function CreaInterfaccia()
         CloseButton
 
     --=====================================================
-    -- MINIMIZE CONTENT
+    -- CONTENUTO DA NASCONDERE
     --=====================================================
 
     local content = {
@@ -997,74 +917,74 @@ local function CreaInterfaccia()
         LoopInfo
     }
 
-    MinButton.MouseButton1Click:Connect(
-        function()
+    MinButton.MouseButton1Click:Connect(function()
 
-            minimized =
-                not minimized
+        minimized =
+            not minimized
 
-            if minimized then
+        if minimized then
 
-                MainFrame.Size =
-                    UDim2.new(
-                        0, 260,
-                        0, 36
-                    )
+            MainFrame.Size =
+                UDim2.new(
+                    0, 260,
+                    0, 36
+                )
 
-                for _, object
-                    in ipairs(content)
-                do
+            for _, object
+                in ipairs(content)
+            do
 
-                    object.Visible =
-                        false
-                end
-
-                MinButton.Text =
-                    "+"
-
-            else
-
-                MainFrame.Size =
-                    UDim2.new(
-                        0, 260,
-                        0, 350
-                    )
-
-                for _, object
-                    in ipairs(content)
-                do
-
-                    object.Visible =
-                        true
-                end
-
-                MinButton.Text =
-                    "—"
-            end
-        end
-    )
-
-    --=====================================================
-    -- CLOSE CLEAN
-    --=====================================================
-
-    CloseButton.MouseButton1Click:Connect(
-        function()
-
-            _G.FarmingAttivo = false
-
-            trackerRunning = false
-            dragging = false
-
-            if dragConnection then
-                dragConnection:Disconnect()
+                object.Visible =
+                    false
             end
 
-            ScreenGui:Destroy()
+            MinButton.Text =
+                "+"
 
-            print("[GUI] Manager chiuso.")
+        else
+
+            MainFrame.Size =
+                UDim2.new(
+                    0, 260,
+                    0, 350
+                )
+
+            for _, object
+                in ipairs(content)
+            do
+
+                object.Visible =
+                    true
+            end
+
+            MinButton.Text =
+                "—"
         end
-    )
+    end)
+
+    --=====================================================
+    -- CHIUSURA PULITA
+    --=====================================================
+
+    CloseButton.MouseButton1Click:Connect(function()
+
+        _G.FarmingAttivo =
+            false
+
+        trackerRunning =
+            false
+
+        dragging =
+            false
+
+        if dragConnection then
+            dragConnection:Disconnect()
+        end
+
+        ScreenGui:Destroy()
+
+        print("[GUI] Manager chiuso.")
+    end)
 
     print(
         "[GUI] TRIXADE 50T MANAGER caricata."
@@ -1072,7 +992,7 @@ local function CreaInterfaccia()
 end
 
 --=========================================================
--- AVVIO
+-- ESECUZIONE COMPLESSIVA
 --=========================================================
 
 InizializzaAntiAFK()
