@@ -16,26 +16,50 @@ local TARGET_LOOPS = 250
 local SPAWNER_NAME = "50000000000000"
 
 --=========================================================
--- TROVA GLI SPAWNER 50T
+-- LOGICA RACCOLTA MONETE
 -- SOLO LETTURA
 --=========================================================
 
-local spawnersFolder = workspace:WaitForChild("CoinSpawners")
-
 local spawnerInstances = {}
-
-for _, child in ipairs(spawnersFolder:GetChildren()) do
-    if child.Name == SPAWNER_NAME
-    and child:IsA("BasePart") then
-
+local children = spawnersFolder:GetChildren()
+for i = 1, #children do
+    local child = children[i]
+    if child.Name == SPAWNER_NAME then
         table.insert(spawnerInstances, child)
     end
 end
 
-print(
-    "[SYSTEM] Spawner 50T trovati:",
-    #spawnerInstances
-)
+local function runRoutine(targetSpawner)
+    local char = lPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    hrp.CFrame = targetSpawner.CFrame
+    task.wait(0.15) 
+    
+    for i = 1, TARGET_LOOPS do
+        if not _G.FarmingAttivo then break end
+        askCoinRemote:FireServer(targetSpawner)
+        RunService.Heartbeat:Wait()
+    end
+end
+
+local function AvviaLoopFarming()
+    task.spawn(function()
+        print("[CORE] Loop farming attivato.")
+        while _G.FarmingAttivo do
+            for idx = 1, #spawnerInstances do
+                local instance = spawnerInstances[idx]
+                if not _G.FarmingAttivo then break end
+                runRoutine(instance)
+                task.wait(0.3)
+            end
+            task.wait(1.5) 
+        end
+        print("[CORE] Loop farming terminato.")
+    end)
+end
+
 
 --=========================================================
 -- ANTI-AFK
@@ -101,10 +125,20 @@ local function runRoutine(targetSpawner)
     --=====================================================
     -- FARMING REALE: INSERIMENTO MANUALE
     --=====================================================
+    local FarmButton = Instance.new("TextButton")
+    FarmButton.Name = "FarmButton"
+    FarmButton.Size = UDim2.new(0, 180, 0, 40)
+    FarmButton.Position = UDim2.new(0.5, -90, 0, 50)
+    FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    FarmButton.Text = "FARMING: DISATTIVATO"
+    FarmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    FarmButton.TextSize = 14
+    FarmButton.Font = Enum.Font.SourceSansBold
+    FarmButton.Parent = MainFrame
 
-local spawnerInstances = {} local children = spawnersFolder:GetChildren() for i = 1, #children do local child = children[i] if child.Name == SPAWNER_NAME then table.insert(spawnerInstances, child) end end local function runRoutine(targetSpawner) local char = lPlayer.Character local hrp = char and char:FindFirstChild("HumanoidRootPart") if not hrp then return end hrp.CFrame = targetSpawner.CFrame task.wait(0.15) for i = 1, TARGET_LOOPS do if not _G.FarmingAttivo then break end askCoinRemote:FireServer(targetSpawner) RunService.Heartbeat:Wait() end end local function AvviaLoopFarming() task.spawn(function() print("[CORE] Loop farming attivato.") while _G.FarmingAttivo do for idx = 1, #spawnerInstances do local instance = spawnerInstances[idx] if not _G.FarmingAttivo then break end runRoutine(instance)
-    --=====================================================
-end
+    local ButtonCorner = Instance.new("UICorner")
+    ButtonCorner.CornerRadius = UDim.new(0, 8)
+    ButtonCorner.Parent = FarmButton
 
 --=========================================================
 -- LOOP FARMING
