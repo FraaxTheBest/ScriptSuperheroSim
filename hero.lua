@@ -2,9 +2,9 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
-local CoreGui = game:GetService("CoreGui")
 
 local lPlayer = Players.LocalPlayer
+local pGui = lPlayer:WaitForChild("PlayerGui") -- Ottimizzato per la visibilità immediata su Delta
 local askCoinRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AskCoin")
 local spawnersFolder = Workspace:WaitForChild("CoinSpawners")
 
@@ -21,10 +21,10 @@ local function InizializzaAntiAFK()
         lPlayer.Idled:Connect(function()
             virtualUser:CaptureController()
             virtualUser:ClickButton2(Vector2.new(0, 0))
-            print("[ANTI-AFK] Rilevato stato IDLE. Input simulato con successo per prevenire il kick!")
+            print("[ANTI-AFK] Input simulato con successo per prevenire il kick!")
         end)
     end)
-    if ok then print("[ANTI-AFK] Sistema di prevenzione disconnessione Attivo.") else print("[ANTI-AFK] Errore inizializzazione:", err) end
+    if ok then print("[ANTI-AFK] Sistema attivo.") else print("[ANTI-AFK] Errore:", err) end
 end
 
 -- ==========================================
@@ -56,7 +56,7 @@ end
 
 local function AvviaLoopFarming()
     task.spawn(function()
-        print("[CORE] Loop farming attivato da GUI.")
+        print("[CORE] Loop farming attivato.")
         while _G.FarmingAttivo do
             for idx = 1, #spawnerInstances do
                 local instance = spawnerInstances[idx]
@@ -74,27 +74,50 @@ end
 -- CREAZIONE INTERFACCIA GRAFICA (GUI)
 -- ==========================================
 local function CreaInterfaccia()
-    -- Distrugge GUI precedenti per evitare duplicati nei riavvii
     local screenName = "SuperheroSim_50T_Gui"
-    local vecchioScreen = CoreGui:FindFirstChild(screenName)
+    local vecchioScreen = pGui:FindFirstChild(screenName)
     if vecchioScreen then vecchioScreen:Destroy() end
 
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = screenName
-    ScreenGui.Parent = CoreGui
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = pGui
 
-    -- Frame Principale Trascinabile
+    -- Frame Principale
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UUDim2.new(0, 220, 0, 160)
+    MainFrame.Size = UDim2.new(0, 220, 0, 160) -- <--- CORRETTO: Rimosso l'errore di battitura UUDim2
     MainFrame.Position = UDim2.new(0.5, -110, 0.4, -80)
     MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
-    MainFrame.Draggable = true -- Ottimizzato per movimenti su schermi mobili Delta
     MainFrame.Parent = ScreenGui
 
-    -- Arrotondamento bordi Frame
+    -- Sistema di trascinamento nativo per Mobile (Delta Touch Fix)
+    local UserInputService = game:GetService("UserInputService")
+    local dragging, dragInput, dragStart, startPos
+    MainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    MainFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
     local FrameCorner = Instance.new("UICorner")
     FrameCorner.CornerRadius = UDim.new(0, 10)
     FrameCorner.Parent = MainFrame
@@ -105,7 +128,7 @@ local function CreaInterfaccia()
     Title.Size = UDim2.new(1, 0, 0, 35)
     Title.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
     Title.Text = "TRIXADE 50T MANAGER"
-    Title.TextColor3 = Color3.fromRGB(255, 215, 0) -- Colore Oro
+    Title.TextColor3 = Color3.fromRGB(255, 215, 0)
     Title.TextSize = 14
     Title.Font = Enum.Font.SourceSansBold
     Title.Parent = MainFrame
@@ -119,7 +142,7 @@ local function CreaInterfaccia()
     FarmButton.Name = "FarmButton"
     FarmButton.Size = UDim2.new(0, 180, 0, 40)
     FarmButton.Position = UDim2.new(0.5, -90, 0, 50)
-    FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Inizia in Rosso (Spento)
+    FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     FarmButton.Text = "FARMING: DISATTIVATO"
     FarmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     FarmButton.TextSize = 14
@@ -130,14 +153,14 @@ local function CreaInterfaccia()
     ButtonCorner.CornerRadius = UDim.new(0, 8)
     ButtonCorner.Parent = FarmButton
 
-    -- Stato dell'Anti-AFK (Testo informativo fisso)
+    -- Stato dell'Anti-AFK
     local AfkStatus = Instance.new("TextLabel")
     AfkStatus.Name = "AfkStatus"
     AfkStatus.Size = UDim2.new(0, 180, 0, 30)
     AfkStatus.Position = UDim2.new(0.5, -90, 0, 105)
     AfkStatus.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
     AfkStatus.Text = "🛡️ ANTI-AFK: ATTIVO PROTETTO"
-    AfkStatus.TextColor3 = Color3.fromRGB(100, 255, 100) -- Verde chiaro
+    AfkStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
     AfkStatus.TextSize = 12
     AfkStatus.Font = Enum.Font.SourceSans
     AfkStatus.Parent = MainFrame
@@ -146,15 +169,14 @@ local function CreaInterfaccia()
     StatusCorner.CornerRadius = UDim.new(0, 6)
     StatusCorner.Parent = AfkStatus
 
-    -- Gestione click pulsante farming
     FarmButton.MouseButton1Click:Connect(function()
         _G.FarmingAttivo = not _G.FarmingAttivo
         if _G.FarmingAttivo then
-            FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50) -- Verde (Acceso)
+            FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
             FarmButton.Text = "FARMING: ATTIVO"
             AvviaLoopFarming()
         else
-            FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Rosso (Spento)
+            FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
             FarmButton.Text = "FARMING: DISATTIVATO"
         end
     end)
@@ -166,7 +188,7 @@ end
 if #spawnerInstances > 0 then
     InizializzaAntiAFK()
     CreaInterfaccia()
-    print("[SYSTEM] GUI caricata in CoreGui. Pronto per il farming AFK.")
+    print("[SYSTEM] GUI creata correttamente sullo schermo.")
 else
-    error("[SYSTEM] Impossibile avviare: Spawner 50T non presenti nel server attuale.")
+    error("[SYSTEM] Nessuno spawner da 50T trovato in questa istanza.")
 end
