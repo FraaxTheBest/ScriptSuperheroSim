@@ -86,7 +86,7 @@ local function CreaInterfaccia()
     -- Frame Principale
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 220, 0, 160) -- <--- CORRETTO: Scritto UDim2.new (Rimosso UUDim2)
+    MainFrame.Size = UDim2.new(0, 220, 0, 160) 
     MainFrame.Position = UDim2.new(0.5, -110, 0.4, -80)
     MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     MainFrame.BorderSizePixel = 0
