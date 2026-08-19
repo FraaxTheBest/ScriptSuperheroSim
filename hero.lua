@@ -188,33 +188,16 @@ end)
 -- START / STOP SOLO GRAFICO
 --=========================================================
 
-local visualRunning = false
+FarmButton.MouseButton1Click:Connect(function()
+    _G.FarmingAttivo = not _G.FarmingAttivo
 
-local StartButton = Instance.new("TextButton")
-StartButton.Name = "StartButton"
-StartButton.Size = UDim2.new(0,210,0,40)
-StartButton.Position = UDim2.new(0.5,-105,0,50)
-StartButton.BackgroundColor3 = Color3.fromRGB(200,50,50)
-StartButton.Text = "STATUS: STOPPED"
-StartButton.TextColor3 = Color3.fromRGB(255,255,255)
-StartButton.TextSize = 14
-StartButton.Font = Enum.Font.SourceSansBold
-StartButton.Parent = MainFrame
-
-local StartCorner = Instance.new("UICorner")
-StartCorner.CornerRadius = UDim.new(0,8)
-StartCorner.Parent = StartButton
-
-StartButton.MouseButton1Click:Connect(function()
-
-    visualRunning = not visualRunning
-
-    if visualRunning then
-        StartButton.Text = "STATUS: RUNNING"
-        StartButton.BackgroundColor3 = Color3.fromRGB(50,180,50)
+    if _G.FarmingAttivo then
+        FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+        FarmButton.Text = "FARMING: ATTIVO"
+        AvviaLoopFarming()
     else
-        StartButton.Text = "STATUS: STOPPED"
-        StartButton.BackgroundColor3 = Color3.fromRGB(200,50,50)
+        FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        FarmButton.Text = "FARMING: DISATTIVATO"
     end
 end)
 
