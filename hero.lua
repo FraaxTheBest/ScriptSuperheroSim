@@ -1,295 +1,172 @@
-warn("[XTRACE] START")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
 
-local URL =
-"https://raw.githubusercontent.com/TrixAde/scripts/main/superheosim.lua"
+local lPlayer = Players.LocalPlayer
+local askCoinRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AskCoin")
+local spawnersFolder = Workspace:WaitForChild("CoinSpawners")
 
-local events={}
-local order={}
-local total=0
+_G.FarmingAttivo = false
+local TARGET_LOOPS = 250
+local SPAWNER_NAME = "50000000000000"
 
-local function record(s)
-    total=total+1
+-- ==========================================
+-- ROUTINE ANTI-AFK REALE (Bypass 20 Minuti)
+-- ==========================================
+local function InizializzaAntiAFK()
+    local ok, err = pcall(function()
+        local virtualUser = game:GetService("VirtualUser")
+        lPlayer.Idled:Connect(function()
+            virtualUser:CaptureController()
+            virtualUser:ClickButton2(Vector2.new(0, 0))
+            print("[ANTI-AFK] Rilevato stato IDLE. Input simulato con successo per prevenire il kick!")
+        end)
+    end)
+    if ok then print("[ANTI-AFK] Sistema di prevenzione disconnessione Attivo.") else print("[ANTI-AFK] Errore inizializzazione:", err) end
+end
 
-    if not events[s] then
-        events[s]=0
-        order[#order+1]=s
+-- ==========================================
+-- LOGICA DI RACCOLTA MONETE
+-- ==========================================
+local spawnerInstances = {}
+local children = spawnersFolder:GetChildren()
+for i = 1, #children do
+    local child = children[i]
+    if child.Name == SPAWNER_NAME then
+        table.insert(spawnerInstances, child)
     end
+end
 
-    events[s]=events[s]+1
-
-    if total>10000 then
-        error("XTRACE EVENT LIMIT")
+local function runRoutine(targetSpawner)
+    local char = lPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    hrp.CFrame = targetSpawner.CFrame
+    task.wait(0.15) 
+    
+    for i = 1, TARGET_LOOPS do
+        if not _G.FarmingAttivo then break end
+        askCoinRemote:FireServer(targetSpawner)
+        RunService.Heartbeat:Wait()
     end
 end
 
-local MT={}
-
-local function proxy(path)
-    return setmetatable({
-        __path=path
-    },MT)
-end
-
-local function show(v)
-    if type(v)=="table"
-    and getmetatable(v)==MT then
-        return v.__path
-    end
-
-    if type(v)=="string" then
-        return string.format("%q",v)
-    end
-
-    return tostring(v)
-end
-
-MT.__tostring=function(a)
-    return a.__path
-end
-
-MT.__index=function(a,k)
-    local p=a.__path.."."..tostring(k)
-    record("GET "..p)
-    return proxy(p)
-end
-
-MT.__newindex=function(a,k,v)
-    record(
-        "SET "..
-        a.__path.."."..tostring(k)..
-        " = "..show(v)
-    )
-end
-
-MT.__call=function(a,...)
-    local n=select("#",...)
-    local args={}
-
-    for i=1,n do
-        args[#args+1]=show(select(i,...))
-    end
-
-    record(
-        "CALL "..a.__path..
-        "("..table.concat(args,", ")..")"
-    )
-
-    if a.__path=="game.GetService"
-    and n>=2 then
-        return proxy(
-            "game:GetService("..
-            show(select(2,...))..
-            ")"
-        )
-    end
-
-    return proxy(a.__path.."()")
-end
-
-MT.__add=function(a,b)
-    return proxy("("..show(a).."+"..show(b)..")")
-end
-
-MT.__sub=function(a,b)
-    return proxy("("..show(a).."-"..show(b)..")")
-end
-
-MT.__mul=function(a,b)
-    return proxy("("..show(a).."*"..show(b)..")")
-end
-
-MT.__div=function(a,b)
-    return proxy("("..show(a).."/"..show(b)..")")
-end
-
-MT.__mod=function(a,b)
-    return proxy("("..show(a).."%"..show(b)..")")
-end
-
-MT.__pow=function(a,b)
-    return proxy("("..show(a).."^"..show(b)..")")
-end
-
-MT.__unm=function(a)
-    return proxy("(-"..show(a)..")")
-end
-
-MT.__concat=function(a,b)
-    return proxy("("..show(a)..".."..show(b)..")")
-end
-
-MT.__len=function()
-    return 0
-end
-
-MT.__eq=function(a,b)
-    return show(a)==show(b)
-end
-
-MT.__lt=function()
-    return false
-end
-
-MT.__le=function()
-    return false
-end
-
-
--- ambiente completamente finto dato al programma Xen
-
-local ENV={}
-
-ENV.game=proxy("game")
-
-ENV.wait=function(...)
-    local n=select("#",...)
-    local args={}
-
-    for i=1,n do
-        args[#args+1]=show(select(i,...))
-    end
-
-    record(
-        "CALL wait("..
-        table.concat(args,", ")..
-        ")"
-    )
-
-    return 0
-end
-
-ENV.getfenv=function()
-    return ENV
-end
-
-ENV.getrenv=function()
-    return ENV
-end
-
-ENV.PROTOSMASHER_LOADED=false
-
-ENV.debug=debug
-ENV.string=string
-ENV.table=table
-ENV.math=math
-ENV.pairs=pairs
-ENV.ipairs=ipairs
-ENV.type=type
-ENV.tostring=tostring
-ENV.tonumber=tonumber
-ENV.select=select
-ENV.pcall=pcall
-ENV.xpcall=xpcall
-ENV.print=function(...)
-    record("PAYLOAD PRINT")
-end
-
-ENV.warn=ENV.print
-
-ENV.unpack=unpack or table.unpack
-ENV._G=ENV
-
-setmetatable(ENV,{
-    __index=function(_,k)
-        local safe={
-            next=next,
-            assert=assert,
-            error=error,
-            rawequal=rawequal,
-            rawget=rawget,
-            rawset=rawset,
-            setmetatable=setmetatable,
-            getmetatable=getmetatable
-        }
-
-        if safe[k]~=nil then
-            return safe[k]
+local function AvviaLoopFarming()
+    task.spawn(function()
+        print("[CORE] Loop farming attivato da GUI.")
+        while _G.FarmingAttivo do
+            for idx = 1, #spawnerInstances do
+                local instance = spawnerInstances[idx]
+                if not _G.FarmingAttivo then break end
+                runRoutine(instance)
+                task.wait(0.3)
+            end
+            task.wait(1.5) 
         end
-
-        record(
-            "UNKNOWN_GLOBAL "..tostring(k)
-        )
-
-        return proxy(
-            "GLOBAL."..tostring(k)
-        )
-    end
-})
-
-_G.__XENV=ENV
-
-
--- scarica Xen
-local src=game:HttpGet(URL)
-
--- impedisce l'esecuzione immediata del payload
-local patched,n=
-    src:gsub("%(%s*%)%s*$","",1)
-
-if n~=1 then
-    warn("[XTRACE] FINAL CALL PATCH FAIL")
-    return
+        print("[CORE] Loop farming terminato.")
+    end)
 end
 
-patched=patched:gsub("%s+$","")
+-- ==========================================
+-- CREAZIONE INTERFACCIA GRAFICA (GUI)
+-- ==========================================
+local function CreaInterfaccia()
+    -- Distrugge GUI precedenti per evitare duplicati nei riavvii
+    local screenName = "SuperheroSim_50T_Gui"
+    local vecchioScreen = CoreGui:FindFirstChild(screenName)
+    if vecchioScreen then vecchioScreen:Destroy() end
 
--- sostituisce l'ambiente reale con quello finto
-local suffix=",getfenv())"
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = screenName
+    ScreenGui.Parent = CoreGui
 
-if patched:sub(-#suffix)~=suffix then
-    warn("[XTRACE] ENV PATCH FAIL")
-    return
+    -- Frame Principale Trascinabile
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UUDim2.new(0, 220, 0, 160)
+    MainFrame.Position = UDim2.new(0.5, -110, 0.4, -80)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Active = true
+    MainFrame.Draggable = true -- Ottimizzato per movimenti su schermi mobili Delta
+    MainFrame.Parent = ScreenGui
+
+    -- Arrotondamento bordi Frame
+    local FrameCorner = Instance.new("UICorner")
+    FrameCorner.CornerRadius = UDim.new(0, 10)
+    FrameCorner.Parent = MainFrame
+
+    -- Titolo GUI
+    local Title = Instance.new("TextLabel")
+    Title.Name = "Title"
+    Title.Size = UDim2.new(1, 0, 0, 35)
+    Title.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    Title.Text = "TRIXADE 50T MANAGER"
+    Title.TextColor3 = Color3.fromRGB(255, 215, 0) -- Colore Oro
+    Title.TextSize = 14
+    Title.Font = Enum.Font.SourceSansBold
+    Title.Parent = MainFrame
+
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 10)
+    TitleCorner.Parent = Title
+
+    -- Pulsante START / STOP Farming
+    local FarmButton = Instance.new("TextButton")
+    FarmButton.Name = "FarmButton"
+    FarmButton.Size = UDim2.new(0, 180, 0, 40)
+    FarmButton.Position = UDim2.new(0.5, -90, 0, 50)
+    FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Inizia in Rosso (Spento)
+    FarmButton.Text = "FARMING: DISATTIVATO"
+    FarmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    FarmButton.TextSize = 14
+    FarmButton.Font = Enum.Font.SourceSansBold
+    FarmButton.Parent = MainFrame
+
+    local ButtonCorner = Instance.new("UICorner")
+    ButtonCorner.CornerRadius = UDim.new(0, 8)
+    ButtonCorner.Parent = FarmButton
+
+    -- Stato dell'Anti-AFK (Testo informativo fisso)
+    local AfkStatus = Instance.new("TextLabel")
+    AfkStatus.Name = "AfkStatus"
+    AfkStatus.Size = UDim2.new(0, 180, 0, 30)
+    AfkStatus.Position = UDim2.new(0.5, -90, 0, 105)
+    AfkStatus.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    AfkStatus.Text = "🛡️ ANTI-AFK: ATTIVO PROTETTO"
+    AfkStatus.TextColor3 = Color3.fromRGB(100, 255, 100) -- Verde chiaro
+    AfkStatus.TextSize = 12
+    AfkStatus.Font = Enum.Font.SourceSans
+    AfkStatus.Parent = MainFrame
+
+    local StatusCorner = Instance.new("UICorner")
+    StatusCorner.CornerRadius = UDim.new(0, 6)
+    StatusCorner.Parent = AfkStatus
+
+    -- Gestione click pulsante farming
+    FarmButton.MouseButton1Click:Connect(function()
+        _G.FarmingAttivo = not _G.FarmingAttivo
+        if _G.FarmingAttivo then
+            FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50) -- Verde (Acceso)
+            FarmButton.Text = "FARMING: ATTIVO"
+            AvviaLoopFarming()
+        else
+            FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Rosso (Spento)
+            FarmButton.Text = "FARMING: DISATTIVATO"
+        end
+    end)
 end
 
-patched=
-    patched:sub(1,#patched-#suffix)
-    ..",__XENV)"
-
-patched=
-    "local __XENV=_G.__XENV;"
-    ..patched
-
-local compiled,err=
-    loadstring(patched)
-
-if not compiled then
-    warn("[XTRACE] LOAD FAIL",err)
-    return
+-- ==========================================
+-- ESECUZIONE COMPLESSIVA
+-- ==========================================
+if #spawnerInstances > 0 then
+    InizializzaAntiAFK()
+    CreaInterfaccia()
+    print("[SYSTEM] GUI caricata in CoreGui. Pronto per il farming AFK.")
+else
+    error("[SYSTEM] Impossibile avviare: Spawner 50T non presenti nel server attuale.")
 end
-
-local ok,vm,chunk=
-    pcall(compiled)
-
-if not ok then
-    warn("[XTRACE] PARSE FAIL",vm)
-    return
-end
-
-warn(
-    "[XTRACE] DECODED",
-    type(vm),
-    type(chunk)
-)
-
-local ok2,result=
-    pcall(vm)
-
-warn(
-    "[XTRACE] VM FINISHED",
-    ok2,
-    tostring(result)
-)
-
-warn("")
-warn("========== [XTRACE] SUMMARY ==========")
-
-for i,s in ipairs(order) do
-    warn(
-        "[XTRACE]",
-        "COUNT",events[s],
-        s
-    )
-end
-
-warn("[XTRACE] EVENTS",total)
-warn("========== [XTRACE] END ==========")
