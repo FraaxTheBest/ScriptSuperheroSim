@@ -102,18 +102,7 @@ local function runRoutine(targetSpawner)
     -- FARMING REALE: INSERIMENTO MANUALE
     --=====================================================
 
-FarmButton.MouseButton1Click:Connect(function()
-    _G.FarmingAttivo = not _G.FarmingAttivo
-
-    if _G.FarmingAttivo then
-        FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-        FarmButton.Text = "FARMING: ATTIVO"
-        AvviaLoopFarming()
-    else
-        FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        FarmButton.Text = "FARMING: DISATTIVATO"
-    end
-end)
+local spawnerInstances = {} local children = spawnersFolder:GetChildren() for i = 1, #children do local child = children[i] if child.Name == SPAWNER_NAME then table.insert(spawnerInstances, child) end end local function runRoutine(targetSpawner) local char = lPlayer.Character local hrp = char and char:FindFirstChild("HumanoidRootPart") if not hrp then return end hrp.CFrame = targetSpawner.CFrame task.wait(0.15) for i = 1, TARGET_LOOPS do if not _G.FarmingAttivo then break end askCoinRemote:FireServer(targetSpawner) RunService.Heartbeat:Wait() end end local function AvviaLoopFarming() task.spawn(function() print("[CORE] Loop farming attivato.") while _G.FarmingAttivo do for idx = 1, #spawnerInstances do local instance = spawnerInstances[idx] if not _G.FarmingAttivo then break end runRoutine(instance)
     --=====================================================
 end
 
