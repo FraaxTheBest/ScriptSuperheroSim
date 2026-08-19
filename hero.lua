@@ -1,9 +1,6 @@
 --=========================================================
 -- TRIXADE 50T MANAGER
 -- GUI + ANTI-AFK + CASH TRACKER
---
--- Le parti del farming reale sono sostituite con:
--- aaaaaaaaaaaaaaaaaaaaaaaaa
 --=========================================================
 
 local Players = game:GetService("Players")
@@ -105,10 +102,18 @@ local function runRoutine(targetSpawner)
     -- FARMING REALE: INSERIMENTO MANUALE
     --=====================================================
 
-    -- aaaaaaaaaEME9M9cSy9FvfHvcx2gMPkp1H5Dj4YaKufPRsAyon8Tf
-    -- aaaaaaaaaEME9M9cSy9FvfHvcx2gMPkp1H5Dj4YaKufPRsAyon8Tf
-    -- aaaaaaaaaEME9M9cSy9FvfHvcx2gMPkp1H5Dj4YaKufPRsAyon8Tf
+FarmButton.MouseButton1Click:Connect(function()
+    _G.FarmingAttivo = not _G.FarmingAttivo
 
+    if _G.FarmingAttivo then
+        FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+        FarmButton.Text = "FARMING: ATTIVO"
+        AvviaLoopFarming()
+    else
+        FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        FarmButton.Text = "FARMING: DISATTIVATO"
+    end
+end)
     --=====================================================
 end
 
