@@ -4,7 +4,7 @@ local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 
 local lPlayer = Players.LocalPlayer
-local pGui = lPlayer:WaitForChild("PlayerGui") -- Ottimizzato per la visibilità immediata su Delta
+local pGui = lPlayer:WaitForChild("PlayerGui") -- Spostato qui per garantire la massima compatibilità su Delta
 local askCoinRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AskCoin")
 local spawnersFolder = Workspace:WaitForChild("CoinSpawners")
 
@@ -24,7 +24,7 @@ local function InizializzaAntiAFK()
             print("[ANTI-AFK] Input simulato con successo per prevenire il kick!")
         end)
     end)
-    if ok then print("[ANTI-AFK] Sistema attivo.") else print("[ANTI-AFK] Errore:", err) end
+    if ok then print("[ANTI-AFK] Sistema di prevenzione attivo.") else print("[ANTI-AFK] Errore:", err) end
 end
 
 -- ==========================================
@@ -86,14 +86,14 @@ local function CreaInterfaccia()
     -- Frame Principale
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 220, 0, 160) -- <--- CORRETTO: Rimosso l'errore di battitura UUDim2
+    MainFrame.Size = UDim2.new(0, 220, 0, 160) -- <--- CORRETTO: Scritto UDim2.new (Rimosso UUDim2)
     MainFrame.Position = UDim2.new(0.5, -110, 0.4, -80)
     MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.Parent = ScreenGui
 
-    -- Sistema di trascinamento nativo per Mobile (Delta Touch Fix)
+    -- Sistema di trascinamento touch nativo per Mobile (Rimpiazza .Draggable rotto)
     local UserInputService = game:GetService("UserInputService")
     local dragging, dragInput, dragStart, startPos
     MainFrame.InputBegan:Connect(function(input)
@@ -188,7 +188,7 @@ end
 if #spawnerInstances > 0 then
     InizializzaAntiAFK()
     CreaInterfaccia()
-    print("[SYSTEM] GUI creata correttamente sullo schermo.")
+    print("[SYSTEM] GUI creata correttamente.")
 else
     error("[SYSTEM] Nessuno spawner da 50T trovato in questa istanza.")
 end
