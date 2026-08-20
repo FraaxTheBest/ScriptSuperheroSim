@@ -34,6 +34,56 @@ end
 print("[CORE] Spawner 50T agganciati nel server:", #spawnerInstances)
 
 --===================================================================================
+-- LOGICA DI RACCOLTA MONETE 
+--===================================================================================
+local farmingThreadAttivo = false
+
+local function runRoutine(targetSpawner)
+    local char = lPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    hrp.CFrame = targetSpawner.CFrame
+    task.wait(0.1)
+    
+    local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AskCoin")
+    
+    for i = 1, TARGET_LOOPS do
+        if not _G.FarmingAttivo then break end
+        remote:FireServer(targetSpawner)
+        
+        if i % 25 == 0 then
+            task.wait(0.01)
+        end
+    end
+end
+
+-- Dichiarazione globale per essere letta dai pulsanti della GUI sotto
+function AvviaLoopFarming()
+    if farmingThreadAttivo then return end
+    farmingThreadAttivo = true
+
+    task.spawn(function()
+        print("[CORE] Loop farming avviato.")
+        while _G.FarmingAttivo do
+            for idx = 1, #spawnerInstances do
+                if not _G.FarmingAttivo then break end
+                local target = spawnerInstances[idx]
+                print("[CORE] Target 50T #" .. tostring(idx))
+                runRoutine(target)
+                task.wait(0.3)
+            end
+            if _G.FarmingAttivo then
+                task.wait(1.5)
+            end
+        end
+        farmingThreadAttivo = false
+        print("[CORE] Loop farming terminato.")
+    end)
+end
+
+
+--===================================================================================
 -- ROUTINE INTERNA E AUTOMAZIONE DEI CICLI DI RETE
 --===================================================================================
 local function runRoutine(targetSpawner)
@@ -190,7 +240,7 @@ local function CreaInterfaccia()
     end)
 
     --=====================================================
-    -- PULSANTE START / STOP FARMING
+    -- PULSANTE START / STOP FARMING 
     --=====================================================
     local FarmButton = Instance.new("TextButton")
     FarmButton.Name = "FarmButton"
@@ -212,12 +262,17 @@ local function CreaInterfaccia()
         if _G.FarmingAttivo then
             FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
             FarmButton.Text = "FARMING: ATTIVO"
-            AvviaLoopFarming()
+            
+            -- Forza l'esecuzione sicura del loop senza blocchi globali
+            pcall(function()
+                AvviaLoopFarming()
+            end)
         else
             FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
             FarmButton.Text = "FARMING: DISATTIVATO"
         end
     end)
+
 
     --=====================================================
     -- PULSANTE INTERATTIVO ANTI-AFK
