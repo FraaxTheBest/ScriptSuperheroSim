@@ -41,37 +41,45 @@ local function runRoutine(targetSpawner)
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
+    -- Allineamento e brevissima attesa di posizionamento
     hrp.CFrame = targetSpawner.CFrame
-    task.wait(0.15)
+    task.wait(0.1) 
     
-    for i = 1, 250 do
+    local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AskCoin")
+    
+    -- Massima raffica mobile (1.000 colpi = 50Qa a fermata)
+    local cicliMassimi = 1000
+    for i = 1, cicliMassimi do
         if not _G.FarmingAttivo then break end
         
-        askCoinRemote:FireServer(targetSpawner)
-        RunService.Heartbeat:Wait()
+        remote:FireServer(targetSpawner)
+        
+        -- Rilascia il thread solo 1 frame ogni 100 colpi per non far crashare l'app Delta
+        if i % 100 == 0 then
+            task.wait()
+        end
     end
 end
 
--- Dichiarazione globale per essere letta dai pulsanti della GUI sotto
+-- Dichiarazione globale per i pulsanti della GUI sotto
 function AvviaLoopFarming()
     if farmingThreadAttivo then return end
     farmingThreadAttivo = true
 
     task.spawn(function()
-        print("[CORE] Loop farming avviato.")
+        print("[CORE] Loop farming ultra-caricato avviato.")
         while _G.FarmingAttivo do
             for idx = 1, #spawnerInstances do
                 if not _G.FarmingAttivo then break end
                 local target = spawnerInstances[idx]
                 print("[CORE] Target 50T #" .. tostring(idx))
                 runRoutine(target)
-                task.wait(0.3)
+                task.wait(0.2) -- Ridotto il tempo di spostamento tra gli spawner
             end
             
-            -- RIGHE DA CORREGGERE: Se il farming è ancora attivo, 
-            -- rilascia il thread per un secondo prima di ricominciare la zona.
+            -- VELOCIZZAZIONE COMPLETA: Ripetizione immediata della zona
             if _G.FarmingAttivo then
-                task.wait(1) 
+                task.wait(0.1) -- Cooldown azzerato al minimo per massimizzare i pacchetti
             else
                 break
             end
@@ -80,7 +88,6 @@ function AvviaLoopFarming()
         print("[CORE] Loop farming terminato.")
     end)
 end
-
 
 --===================================================================================
 -- PROTEZIONE ANTI-AFK REALE (PREVENZIONE KICK 20 MINUTI)
@@ -151,12 +158,12 @@ local function CreaInterfaccia()
     ScreenGui.Parent = pGui
 
     --=====================================================
-    -- FRAME PRINCIPALE
+    -- FRAME PRINCIPALE (ALTEZZA AGGIORNATA A 390)
     --=====================================================
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 260, 0, 350)
-    MainFrame.Position = UDim2.new(0.5, -130, 0.4, -175)
+    MainFrame.Size = UDim2.new(0, 260, 0, 390) -- Aumentato per contenere Potato Mode
+    MainFrame.Position = UDim2.new(0.5, -130, 0.4, -195)
     MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
@@ -167,7 +174,7 @@ local function CreaInterfaccia()
     FrameCorner.Parent = MainFrame
 
     --=====================================================
-    -- BARRA DEL TITOLO TRASCINABILE
+    -- TITOLO GUI (BARRA DI TRASCINAMENTO)
     --=====================================================
     local Title = Instance.new("TextLabel")
     Title.Name = "Title"
@@ -175,7 +182,7 @@ local function CreaInterfaccia()
     Title.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
     Title.BorderSizePixel = 0
     Title.Text = "TRIXADE 50T MANAGER"
-    Title.TextColor3 = Color3.fromRGB(255, 215, 0) -- Oro
+    Title.TextColor3 = Color3.fromRGB(255, 215, 0)
     Title.TextSize = 14
     Title.Font = Enum.Font.SourceSansBold
     Title.Active = true
@@ -185,7 +192,7 @@ local function CreaInterfaccia()
     TitleCorner.CornerRadius = UDim.new(0, 10)
     TitleCorner.Parent = Title
 
-    -- Sistema di drag nativo per schermi Mobile Delta Touch Fix
+    -- Sistema di drag nativo Mobile Delta Touch Fix
     local dragging = false
     local dragInput = nil
     local dragStart = nil
@@ -214,7 +221,7 @@ local function CreaInterfaccia()
             MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
-
+    
     --=====================================================
     -- PULSANTE START / STOP FARMING 
     --=====================================================
@@ -278,6 +285,86 @@ local function CreaInterfaccia()
             AfkButton.BackgroundColor3 = Color3.fromRGB(130, 60, 60)
         end
     end)
+    
+    --=====================================================
+    -- PULSANTE POTATO MODE (FPS BOOST INTERATTIVO)
+    --=====================================================
+    local PotatoButton = Instance.new("TextButton")
+    PotatoButton.Name = "PotatoButton"
+    PotatoButton.Size = UDim2.new(0, 220, 0, 30)
+    PotatoButton.Position = UDim2.new(0.5, -110, 0, 137) -- Sotto l'Anti-AFK
+    PotatoButton.Text = "POTATO MODE: SPENTO"
+    PotatoButton.BackgroundColor3 = Color3.fromRGB(130, 60, 60)
+    PotatoButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    PotatoButton.TextSize = 12
+    PotatoButton.Font = Enum.Font.SourceSansBold
+    PotatoButton.Parent = MainFrame
+
+    local PotatoCorner = Instance.new("UICorner")
+    PotatoCorner.CornerRadius = UDim.new(0, 7)
+    PotatoCorner.Parent = PotatoButton
+
+    local PotatoAttivo = false
+    local originalMaterials = {}
+    local descConnection = nil
+
+    local function applicaPotato(obj)
+        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+            if not originalMaterials[obj] then
+                originalMaterials[obj] = {
+                    Material = obj.Material,
+                    Color = obj.Color,
+                    CastShadow = obj.CastShadow
+                }
+            end
+            obj.Material = Enum.Material.SmoothPlastic
+            obj.Color = Color3.fromRGB(120, 120, 120)
+            obj.CastShadow = false
+        elseif obj:IsA("Texture") or obj:IsA("Decal") then
+            obj.Transparency = 1
+        elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") then
+            obj.Enabled = false
+        end
+    end
+
+    local function rimuoviPotato()
+        for obj, data in pairs(originalMaterials) do
+            if obj and obj.Parent then
+                obj.Material = data.Material
+                obj.Color = data.Color
+                obj.CastShadow = data.CastShadow
+            end
+        end
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("Texture") or obj:IsA("Decal") then
+                obj.Transparency = 0
+            elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") then
+                obj.Enabled = true
+            end
+        end
+        table.clear(originalMaterials)
+    end
+
+    PotatoButton.MouseButton1Click:Connect(function()
+        if not MainFrame.Parent then return end
+        PotatoAttivo = not PotatoAttivo
+        if PotatoAttivo then
+            PotatoButton.Text = "POTATO MODE: ATTIVO"
+            PotatoButton.BackgroundColor3 = Color3.fromRGB(45, 110, 55)
+            for _, child in ipairs(workspace:GetDescendants()) do
+                applicaPotato(child)
+            end
+            descConnection = workspace.DescendantAdded:Connect(function(child)
+                task.wait()
+                if PotatoAttivo then applicaPotato(child) end
+            end)
+        else
+            PotatoButton.Text = "POTATO MODE: SPENTO"
+            PotatoButton.BackgroundColor3 = Color3.fromRGB(130, 60, 60)
+            if descConnection then descConnection:Disconnect() end
+            rimuoviPotato()
+        end
+    end)
 
     --=====================================================
     -- COSTRUTTORE MODULI INFORMATIVI (LABEL)
@@ -301,12 +388,15 @@ local function CreaInterfaccia()
         return label
     end
 
-    local CurrentCash = makeLabel("CurrentCash", 143, "CASH: caricamento...")
-    local GainSecond  = makeLabel("GainSecond", 177, "GUADAGNO / SEC: +0")
-    local GainMinute  = makeLabel("GainMinute", 211, "ULTIMI 60 SEC: +0")
-    local GainSession = makeLabel("GainSession", 245, "SESSIONE: +0")
-    local SpawnerInfo = makeLabel("SpawnerInfo", 279, "SPAWNER 50T: " .. tostring(#spawnerInstances))
-    local LoopInfo    = makeLabel("LoopInfo", 313, "LOOPS CONFIG: " .. tostring(TARGET_LOOPS))
+    --=====================================================
+    -- CONTATORI (COORDINATE Y  DOWNSTREAM)
+    --=====================================================
+    local CurrentCash = makeLabel("CurrentCash", 178, "CASH: caricamento...")
+    local GainSecond  = makeLabel("GainSecond", 212, "GUADAGNO / SEC: +0")
+    local GainMinute  = makeLabel("GainMinute", 246, "ULTIMI 60 SEC: +0")
+    local GainSession = makeLabel("GainSession", 280, "SESSIONE: +0")
+    local SpawnerInfo = makeLabel("SpawnerInfo", 314, "SPAWNER 50T: " .. tostring(#spawnerInstances))
+    local LoopInfo    = makeLabel("LoopInfo", 348, "LOOPS CONFIG: " .. tostring(TARGET_LOOPS))
 
     --=====================================================
     -- MOTORE DI CALCOLO CASH TRACKER IN TEMPO REALE (FIXED)
@@ -407,11 +497,12 @@ local function CreaInterfaccia()
     CloseCorner.CornerRadius = UDim.new(0, 6)
     CloseCorner.Parent = CloseButton
     --=====================================================
-    -- CONFIGURAZIONE STRUTTURALE CONTENUTI GUI
+    -- CONFIGURAZIONE STRUTTURALE CONTENUTI E INTERRUTTORI
     --=====================================================
     local content = {
         FarmButton, 
         AfkButton, 
+        PotatoButton, -- Integrato nel modulo di contrazione visiva
         CurrentCash,
         GainSecond, 
         GainMinute, 
@@ -420,7 +511,6 @@ local function CreaInterfaccia()
         LoopInfo
     }
 
-    -- Gestione interattiva pulsante riduci/espandi
     MinButton.MouseButton1Click:Connect(function()
         minimized = not minimized
         if minimized then
@@ -431,7 +521,7 @@ local function CreaInterfaccia()
             end
             MinButton.Text = "+"
         else
-            MainFrame.Size = UDim2.new(0, 260, 0, 350)
+            MainFrame.Size = UDim2.new(0, 260, 0, 390) -- Espansione completa a 390
             for i = 1, #content do
                 local object = content[i]
                 if object then object.Visible = true end
@@ -441,13 +531,16 @@ local function CreaInterfaccia()
     end)
 
     --=====================================================
-    -- CHIUSURA PULITA E DISCONNESSIONE EVENTI
+    -- CHIUSURA PULITA DI MEMORIA E EVENTI
     --=====================================================
     CloseButton.MouseButton1Click:Connect(function()
         _G.FarmingAttivo = false
         trackerRunning = false
+        dragging = false
         
-        -- Chiusura sicura senza crash da variabili nil
+        pcall(function()
+            if descConnection then descConnection:Disconnect() end
+        end)
         pcall(function()
             if dragConnection then dragConnection:Disconnect() end
         end)
