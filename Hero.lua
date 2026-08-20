@@ -86,28 +86,6 @@ function AvviaLoopFarming()
     end)
 end
 
---===================================================================================
--- ROUTINE INTERNA E AUTOMAZIONE DEI CICLI DI RETE
---===================================================================================
-local function runRoutine(targetSpawner)
-    local char = lPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    
-    hrp.CFrame = targetSpawner.CFrame
-    task.wait(0.1) 
-    
-    local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AskCoin")
-    
-    for i = 1, TARGET_LOOPS do
-        if not _G.FarmingAttivo then break end
-        remote:FireServer(targetSpawner)
-        
-        if i % 25 == 0 then
-            task.wait(0.01)
-        end
-    end
-end
 
 --===================================================================================
 -- PROTEZIONE ANTI-AFK REALE (PREVENZIONE KICK 20 MINUTI)
