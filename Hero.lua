@@ -73,15 +73,19 @@ function AvviaLoopFarming()
                 runRoutine(target)
                 task.wait(0.3)
             end
+            
+            -- RIGHE DA CORREGGERE: Se il farming è ancora attivo, 
+            -- rilascia il thread per un secondo prima di ricominciare la zona.
             if _G.FarmingAttivo then
-                task.wait(1.5)
+                task.wait(1) 
+            else
+                break
             end
         end
         farmingThreadAttivo = false
         print("[CORE] Loop farming terminato.")
     end)
 end
-
 
 --===================================================================================
 -- ROUTINE INTERNA E AUTOMAZIONE DEI CICLI DI RETE
