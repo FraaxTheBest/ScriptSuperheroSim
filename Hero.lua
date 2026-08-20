@@ -96,7 +96,7 @@ local function runRoutine(targetSpawner)
     if not hrp then return end
     
     hrp.CFrame = targetSpawner.CFrame
-    task.wait(0.1)
+    task.wait(0.1) 
     
     local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AskCoin")
     
