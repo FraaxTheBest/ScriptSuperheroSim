@@ -278,7 +278,7 @@ local function CreaInterfaccia()
     local LoopInfo    = makeLabel("LoopInfo", 313, "LOOPS CONFIG: " .. tostring(TARGET_LOOPS))
 
     --=====================================================
-    -- MOTORE DI CALCOLO CASH TRACKER IN TEMPO REALE
+    -- MOTORE DI CALCOLO CASH TRACKER IN TEMPO REALE (FIXED)
     --=====================================================
     local trackerRunning = true
 
@@ -287,6 +287,28 @@ local function CreaInterfaccia()
         if not leaderstats then CurrentCash.Text = "CASH: N/D" return end
         local cash = leaderstats:WaitForChild("Cash", 10)
         if not cash then CurrentCash.Text = "CASH: N/D" return end
+
+        -- Funzione di formattazione locale interna per evitare errori di tipo nil
+        local function localFormat(val)
+            local n = tonumber(val) or 0
+            local sign = n < 0 and "-" or ""
+            n = math.abs(n)
+            if n >= 1e27 then return sign .. string.format("%.2fOc", n / 1e27)
+            elseif n >= 1e24 then return sign .. string.format("%.2fSp", n / 1e24)
+            elseif n >= 1e21 then return sign .. string.format("%.2fSx", n / 1e21)
+            elseif n >= 1e18 then return sign .. string.format("%.2fQi", n / 1e18)
+            elseif n >= 1e15 then return sign .. string.format("%.2fQa", n / 1e15)
+            elseif n >= 1e12 then return sign .. string.format("%.2fT", n / 1e12)
+            elseif n >= 1e9 then return sign .. string.format("%.2fB", n / 1e9)
+            elseif n >= 1e6 then return sign .. string.format("%.2fM", n / 1e6)
+            elseif n >= 1e3 then return sign .. string.format("%.2fK", n / 1e3)
+            end
+            return sign .. tostring(math.floor(n))
+        end
+
+        local function localSigned(val)
+            return (tonumber(val) or 0) >= 0 and "+" .. localFormat(val) or localFormat(val)
+        end
 
         local sessionStart = tonumber(cash.Value) or 0
         local previousCash = sessionStart
@@ -308,10 +330,10 @@ local function CreaInterfaccia()
             local minuteDelta = current - history[1].cash
             local sessionDelta = current - sessionStart
 
-            CurrentCash.Text = "CASH: " .. formatNumber(current)
-            GainSecond.Text = "GUADAGNO / SEC: " .. signedNumber(secondDelta)
-            GainMinute.Text = "ULTIMI 60 SEC: " .. signedNumber(minuteDelta)
-            GainSession.Text = "SESSIONE: " .. signedNumber(sessionDelta)
+            CurrentCash.Text = "CASH: " .. localFormat(current)
+            GainSecond.Text = "GUADAGNO / SEC: " .. localSigned(secondDelta)
+            GainMinute.Text = "ULTIMI 60 SEC: " .. localSigned(minuteDelta)
+            GainSession.Text = "SESSIONE: " .. localSigned(sessionDelta)
         end
     end)
 
