@@ -36,46 +36,27 @@ print("[CORE] Spawner 50T agganciati nel server:", #spawnerInstances)
 --===================================================================================
 -- ROUTINE INTERNA E AUTOMAZIONE DEI CICLI DI RETE
 --===================================================================================
-local farmingThreadAttivo = false
-
 local function runRoutine(targetSpawner)
     local char = lPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
-    -- Posizionamento esatto sopra lo spawner (Fissato a ~1.03 studs rilevati)
+    -- Si teletrasporta SOPRA lo spawner UNA SOLA VOLTA
     hrp.CFrame = targetSpawner.CFrame
-    task.wait(0.15) 
+    task.wait(0.1) -- Attesa minima per stabilizzare la posizione lato server
     
-    -- Loop ad alta velocità agganciato alla fisica del client
+    -- BATCH SPAM: Invia le richieste a blocchi lasciando respirare il telefono
     for i = 1, TARGET_LOOPS do
         if not _G.FarmingAttivo then break end
+        
         askCoinRemote:FireServer(targetSpawner)
-        RunService.Heartbeat:Wait()
-    end
-end
-
-local function AvviaLoopFarming()
-    if farmingThreadAttivo then return end
-    farmingThreadAttivo = true
-
-    task.spawn(function()
-        print("[CORE] Loop farming principale avviato.")
-        while _G.FarmingAttivo do
-            for idx = 1, #spawnerInstances do
-                if not _G.FarmingAttivo then break end
-                local target = spawnerInstances[idx]
-                print("[CORE] Richiesta inviata a Spawner 50T #" .. tostring(idx))
-                runRoutine(target)
-                task.wait(0.3) -- Pausa di assestamento anti-kick
-            end
-            if _G.FarmingAttivo then
-                task.wait(1.5) -- Attesa ricarica zona prima di rieseguire il giro
-            end
+        
+        -- Ogni 25 richieste inviate, rilascia il frame per 0.01 secondi.
+        -- Questo elimina il lag grafico mantenendo la velocità di guadagno altissima.
+        if i % 25 == 0 then
+            task.wait(0.01)
         end
-        farmingThreadAttivo = false
-        print("[CORE] Loop farming principale arrestato.")
-    end)
+    end
 end
 
 --===================================================================================
