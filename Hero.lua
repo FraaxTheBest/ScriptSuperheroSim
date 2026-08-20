@@ -41,18 +41,15 @@ local function runRoutine(targetSpawner)
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
-    -- Si teletrasporta SOPRA lo spawner UNA SOLA VOLTA
     hrp.CFrame = targetSpawner.CFrame
-    task.wait(0.1) -- Attesa minima per stabilizzare la posizione lato server
+    task.wait(0.1)
     
-    -- BATCH SPAM: Invia le richieste a blocchi lasciando respirare il telefono
+    local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AskCoin")
+    
     for i = 1, TARGET_LOOPS do
         if not _G.FarmingAttivo then break end
+        remote:FireServer(targetSpawner)
         
-        askCoinRemote:FireServer(targetSpawner)
-        
-        -- Ogni 25 richieste inviate, rilascia il frame per 0.01 secondi.
-        -- Questo elimina il lag grafico mantenendo la velocità di guadagno altissima.
         if i % 25 == 0 then
             task.wait(0.01)
         end
