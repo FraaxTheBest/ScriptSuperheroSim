@@ -1,77 +1,53 @@
---=========================================================
--- TRIXADE 50T MANAGER
--- STRUTTURA PULITA
---=========================================================
+
+--===================================================================================
+-- CONFIGURAZIONE ENGINE, FARMING LOOP, ANTI-AFK E MOTORE ECONOMICO
+--===================================================================================
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local lPlayer = Players.LocalPlayer
 local pGui = lPlayer:WaitForChild("PlayerGui")
+local askCoinRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AskCoin")
 
 _G.FarmingAttivo = false
-
 local TARGET_LOOPS = 250
 local SPAWNER_NAME = "50000000000000"
 
---=========================================================
--- CARTELLA SPAWNER
---=========================================================
-
-local spawnersFolder =
-    Workspace:WaitForChild("CoinSpawners")
-
---=========================================================
--- LOGICA DI RACCOLTA MONETE
---=========================================================
-
-local spawnerInstances = {}
-
-local children =
-    spawnersFolder:GetChildren()
-
-for i = 1, #children do
-
-    local child = children[i]
-
-    if child.Name == SPAWNER_NAME
-    and child:IsA("BasePart") then
-
-        table.insert(
-            spawnerInstances,
-            child
-        )
-    end
-end
-
-print(
-    "[CORE] Spawner 50T trovati:",
-    #spawnerInstances
-)
-
---=========================================================
--- ROUTINE SINGOLO SPAWNER
---=========================================================
-
+--===================================================================================
+-- CARTELLA SPAWNER E LOGICA DI INDIVIDUAZIONE
+--===================================================================================
+local spawnersFolder = Workspace:WaitForChild("CoinSpawners")
 local spawnerInstances = {}
 local children = spawnersFolder:GetChildren()
+
 for i = 1, #children do
     local child = children[i]
-    if child.Name == SPAWNER_NAME then
+    if child.Name == SPAWNER_NAME and child:IsA("BasePart") then
         table.insert(spawnerInstances, child)
     end
 end
+
+print("[CORE] Spawner 50T agganciati nel server:", #spawnerInstances)
+
+--===================================================================================
+-- ROUTINE INTERNA E AUTOMAZIONE DEI CICLI DI RETE
+--===================================================================================
+local farmingThreadAttivo = false
 
 local function runRoutine(targetSpawner)
     local char = lPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
+    -- Posizionamento esatto sopra lo spawner (Fissato a ~1.03 studs rilevati)
     hrp.CFrame = targetSpawner.CFrame
     task.wait(0.15) 
     
+    -- Loop ad alta velocità agganciato alla fisica del client
     for i = 1, TARGET_LOOPS do
         if not _G.FarmingAttivo then break end
         askCoinRemote:FireServer(targetSpawner)
@@ -80,922 +56,391 @@ local function runRoutine(targetSpawner)
 end
 
 local function AvviaLoopFarming()
-    task.spawn(function()
-        print("[CORE] Loop farming attivato.")
-        while _G.FarmingAttivo do
-            for idx = 1, #spawnerInstances do
-                local instance = spawnerInstances[idx]
-                if not _G.FarmingAttivo then break end
-                runRoutine(instance)
-                task.wait(0.3)
-            end
-            task.wait(1.5) 
-        end
-        print("[CORE] Loop farming terminato.")
-    end)
-end
-
-
---=========================================================
--- LOOP AUTOFARM
---=========================================================
-
-local farmingThreadAttivo = false
-
-local function AvviaLoopFarming()
-
-    -- Evita thread doppi premendo START molte volte
-    if farmingThreadAttivo then
-        return
-    end
-
+    if farmingThreadAttivo then return end
     farmingThreadAttivo = true
 
     task.spawn(function()
-
-        print("[CORE] Loop farming avviato.")
-
+        print("[CORE] Loop farming principale avviato.")
         while _G.FarmingAttivo do
-
             for idx = 1, #spawnerInstances do
-
-                if not _G.FarmingAttivo then
-                    break
-                end
-
-                local target =
-                    spawnerInstances[idx]
-
-                print(
-                    "[CORE] Target 50T #"
-                    .. tostring(idx)
-                )
-
+                if not _G.FarmingAttivo then break end
+                local target = spawnerInstances[idx]
+                print("[CORE] Richiesta inviata a Spawner 50T #" .. tostring(idx))
                 runRoutine(target)
-
-                task.wait(0.3)
+                task.wait(0.3) -- Pausa di assestamento anti-kick
             end
-
             if _G.FarmingAttivo then
-                task.wait(1.5)
+                task.wait(1.5) -- Attesa ricarica zona prima di rieseguire il giro
             end
         end
-
         farmingThreadAttivo = false
-
-        print("[CORE] Loop farming terminato.")
+        print("[CORE] Loop farming principale arrestato.")
     end)
 end
 
---=========================================================
--- ANTI-AFK
---=========================================================
-
+--===================================================================================
+-- PROTEZIONE ANTI-AFK REALE (PREVENZIONE KICK 20 MINUTI)
+--===================================================================================
 local AntiAfkAttivo = true
 local idleConnection = nil
 
 local function InizializzaAntiAFK()
-
-    local ok, err =
-        pcall(function()
-
-            local VirtualUser =
-                game:GetService("VirtualUser")
-
-            idleConnection =
-                lPlayer.Idled:Connect(function()
-
-                    if not AntiAfkAttivo then
-                        return
-                    end
-
-                    pcall(function()
-
-                        VirtualUser:CaptureController()
-
-                        VirtualUser:ClickButton2(
-                            Vector2.new(0, 0)
-                        )
-                    end)
-
-                    print("[ANTI-AFK] Input simulato.")
-                end)
+    local ok, err = pcall(function()
+        local VirtualUser = game:GetService("VirtualUser")
+        idleConnection = lPlayer.Idled:Connect(function()
+            if not AntiAfkAttivo then return end
+            pcall(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new(0, 0))
+            end)
+            print("[ANTI-AFK] Simulazione input completata con successo.")
         end)
+    end)
 
     if ok then
-        print("[ANTI-AFK] Sistema attivo.")
+        print("[ANTI-AFK] Sistema di monitoraggio IDLE attivo.")
     else
-        warn(
-            "[ANTI-AFK] Errore:",
-            err
-        )
+        warn("[ANTI-AFK] Errore inizializzazione modulo:", err)
     end
 end
 
---=========================================================
--- FORMATTAZIONE NUMERI
---=========================================================
-
+--===================================================================================
+-- SISTEMA DI FORMATTAZIONE NUMERICA ECONOMY COMPLETA (K, M, B, T, Qa, Qi, Sx, Sp, Oc)
+--===================================================================================
 local function formatNumber(n)
-
     n = tonumber(n) or 0
-
     local sign = ""
-
     if n < 0 then
         sign = "-"
         n = math.abs(n)
     end
 
-    if n >= 1e24 then
-        return sign .. string.format("%.2fSp", n / 1e24)
-
-    elseif n >= 1e21 then
-        return sign .. string.format("%.2fSx", n / 1e21)
-
-    elseif n >= 1e18 then
-        return sign .. string.format("%.2fQi", n / 1e18)
-
-    elseif n >= 1e15 then
-        return sign .. string.format("%.2fQa", n / 1e15)
-
-    elseif n >= 1e12 then
-        return sign .. string.format("%.2fT", n / 1e12)
-
-    elseif n >= 1e9 then
-        return sign .. string.format("%.2fB", n / 1e9)
-
-    elseif n >= 1e6 then
-        return sign .. string.format("%.2fM", n / 1e6)
-
-    elseif n >= 1e3 then
-        return sign .. string.format("%.2fK", n / 1e3)
+    if n >= 1e27 then return sign .. string.format("%.2fOc", n / 1e27) -- Ottilioni
+    elseif n >= 1e24 then return sign .. string.format("%.2fSp", n / 1e24) -- Settilioni
+    elseif n >= 1e21 then return sign .. string.format("%.2fSx", n / 1e21) -- Sestilioni
+    elseif n >= 1e18 then return sign .. string.format("%.2fQi", n / 1e18) -- Quintilioni
+    elseif n >= 1e15 then return sign .. string.format("%.2fQa", n / 1e15) -- Quadrilioni
+    elseif n >= 1e12 then return sign .. string.format("%.2fT", n / 1e12) -- Trilioni
+    elseif n >= 1e9 then return sign .. string.format("%.2fB", n / 1e9) -- Miliardi
+    elseif n >= 1e6 then return sign .. string.format("%.2fM", n / 1e6) -- Milioni
+    elseif n >= 1e3 then return sign .. string.format("%.2fK", n / 1e3) -- Migliaia
     end
-
     return sign .. tostring(math.floor(n))
 end
 
 local function signedNumber(n)
-
-    if n >= 0 then
-        return "+" .. formatNumber(n)
-    end
-
+    if n >= 0 then return "+" .. formatNumber(n) end
     return formatNumber(n)
 end
 
---=========================================================
--- CREAZIONE INTERFACCIA GRAFICA (GUI)
---=========================================================
-
 local function CreaInterfaccia()
-
-    local screenName =
-        "SuperheroSim_50T_Gui"
-
-    local vecchioScreen =
-        pGui:FindFirstChild(screenName)
-
-    if vecchioScreen then
-        vecchioScreen:Destroy()
-    end
+    local screenName = "SuperheroSim_50T_Gui"
+    local vecchioScreen = pGui:FindFirstChild(screenName)
+    if vecchioScreen then vecchioScreen:Destroy() end
 
     --=====================================================
     -- SCREEN GUI
     --=====================================================
-
-    local ScreenGui =
-        Instance.new("ScreenGui")
-
-    ScreenGui.Name =
-        screenName
-
-    ScreenGui.ResetOnSpawn =
-        false
-
-    ScreenGui.Parent =
-        pGui
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = screenName
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = pGui
 
     --=====================================================
     -- FRAME PRINCIPALE
     --=====================================================
-
-    local MainFrame =
-        Instance.new("Frame")
-
-    MainFrame.Name =
-        "MainFrame"
-
-    MainFrame.Size =
-        UDim2.new(
-            0, 260,
-            0, 350
-        )
-
-    MainFrame.Position =
-        UDim2.new(
-            0.5, -130,
-            0.4, -175
-        )
-
-    MainFrame.BackgroundColor3 =
-        Color3.fromRGB(
-            30, 30, 35
-        )
-
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 260, 0, 350)
+    MainFrame.Position = UDim2.new(0.5, -130, 0.4, -175)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.Parent = ScreenGui
 
-    local FrameCorner =
-        Instance.new("UICorner")
-
-    FrameCorner.CornerRadius =
-        UDim.new(0, 10)
-
-    FrameCorner.Parent =
-        MainFrame
+    local FrameCorner = Instance.new("UICorner")
+    FrameCorner.CornerRadius = UDim.new(0, 10)
+    FrameCorner.Parent = MainFrame
 
     --=====================================================
-    -- TITOLO GUI
+    -- BARRA DEL TITOLO TRASCINABILE
     --=====================================================
-
-    local Title =
-        Instance.new("TextLabel")
-
-    Title.Name =
-        "Title"
-
-    Title.Size =
-        UDim2.new(
-            1, 0,
-            0, 36
-        )
-
-    Title.BackgroundColor3 =
-        Color3.fromRGB(
-            40, 40, 45
-        )
-
+    local Title = Instance.new("TextLabel")
+    Title.Name = "Title"
+    Title.Size = UDim2.new(1, 0, 0, 36)
+    Title.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
     Title.BorderSizePixel = 0
-
-    Title.Text =
-        "TRIXADE 50T MANAGER"
-
-    Title.TextColor3 =
-        Color3.fromRGB(
-            255, 215, 0
-        )
-
+    Title.Text = "TRIXADE 50T MANAGER"
+    Title.TextColor3 = Color3.fromRGB(255, 215, 0) -- Oro
     Title.TextSize = 14
     Title.Font = Enum.Font.SourceSansBold
     Title.Active = true
     Title.Parent = MainFrame
 
-    local TitleCorner =
-        Instance.new("UICorner")
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 10)
+    TitleCorner.Parent = Title
 
-    TitleCorner.CornerRadius =
-        UDim.new(0, 10)
-
-    TitleCorner.Parent =
-        Title
-
-    --=====================================================
-    -- Sistema di trascinamento touch nativo per Mobile
-    -- (Rimpiazza .Draggable rotto)
-    --=====================================================
-
+    -- Sistema di drag nativo per schermi Mobile Delta Touch Fix
     local dragging = false
     local dragInput = nil
     local dragStart = nil
     local startPos = nil
 
     Title.InputBegan:Connect(function(input)
-
-        if
-            input.UserInputType
-                == Enum.UserInputType.MouseButton1
-            or
-            input.UserInputType
-                == Enum.UserInputType.Touch
-        then
-
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
             startPos = MainFrame.Position
-
             input.Changed:Connect(function()
-
-                if
-                    input.UserInputState
-                    == Enum.UserInputState.End
-                then
-                    dragging = false
-                end
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
             end)
         end
     end)
 
     Title.InputChanged:Connect(function(input)
-
-        if
-            input.UserInputType
-                == Enum.UserInputType.MouseMovement
-            or
-            input.UserInputType
-                == Enum.UserInputType.Touch
-        then
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
             dragInput = input
         end
     end)
 
-    local dragConnection =
-        UserInputService.InputChanged:Connect(
-            function(input)
-
-                if
-                    input == dragInput
-                    and dragging
-                    and MainFrame.Parent
-                then
-
-                    local delta =
-                        input.Position - dragStart
-
-                    MainFrame.Position =
-                        UDim2.new(
-                            startPos.X.Scale,
-                            startPos.X.Offset + delta.X,
-                            startPos.Y.Scale,
-                            startPos.Y.Offset + delta.Y
-                        )
-                end
-            end
-        )
+    local dragConnection = UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging and MainFrame.Parent then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
 
     --=====================================================
-    -- Pulsante START / STOP Farming
+    -- PULSANTE START / STOP FARMING
     --=====================================================
-
-    local FarmButton =
-        Instance.new("TextButton")
-
-    FarmButton.Name =
-        "FarmButton"
-
-    FarmButton.Size =
-        UDim2.new(
-            0, 220,
-            0, 42
-        )
-
-    FarmButton.Position =
-        UDim2.new(
-            0.5, -110,
-            0, 50
-        )
-
-    FarmButton.BackgroundColor3 =
-        Color3.fromRGB(
-            200, 50, 50
-        )
-
-    FarmButton.Text =
-        "FARMING: DISATTIVATO"
-
-    FarmButton.TextColor3 =
-        Color3.fromRGB(
-            255, 255, 255
-        )
-
+    local FarmButton = Instance.new("TextButton")
+    FarmButton.Name = "FarmButton"
+    FarmButton.Size = UDim2.new(0, 220, 0, 42)
+    FarmButton.Position = UDim2.new(0.5, -110, 0, 50)
+    FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    FarmButton.Text = "FARMING: DISATTIVATO"
+    FarmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     FarmButton.TextSize = 14
     FarmButton.Font = Enum.Font.SourceSansBold
     FarmButton.Parent = MainFrame
 
-    local FarmCorner =
-        Instance.new("UICorner")
-
-    FarmCorner.CornerRadius =
-        UDim.new(0, 8)
-
-    FarmCorner.Parent =
-        FarmButton
-
-    --=====================================================
-    -- COLLEGAMENTO START / STOP
-    --=====================================================
+    local FarmCorner = Instance.new("UICorner")
+    FarmCorner.CornerRadius = UDim.new(0, 8)
+    FarmCorner.Parent = FarmButton
 
     FarmButton.MouseButton1Click:Connect(function()
-
-        _G.FarmingAttivo =
-            not _G.FarmingAttivo
-
+        _G.FarmingAttivo = not _G.FarmingAttivo
         if _G.FarmingAttivo then
-
-            FarmButton.BackgroundColor3 =
-                Color3.fromRGB(
-                    50, 180, 50
-                )
-
-            FarmButton.Text =
-                "FARMING: ATTIVO"
-
+            FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+            FarmButton.Text = "FARMING: ATTIVO"
             AvviaLoopFarming()
-
         else
-
-            FarmButton.BackgroundColor3 =
-                Color3.fromRGB(
-                    200, 50, 50
-                )
-
-            FarmButton.Text =
-                "FARMING: DISATTIVATO"
+            FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            FarmButton.Text = "FARMING: DISATTIVATO"
         end
     end)
 
     --=====================================================
-    -- ANTI-AFK BUTTON
+    -- PULSANTE INTERATTIVO ANTI-AFK
     --=====================================================
-
-    local AfkButton =
-        Instance.new("TextButton")
-
-    AfkButton.Name =
-        "AfkButton"
-
-    AfkButton.Size =
-        UDim2.new(
-            0, 220,
-            0, 30
-        )
-
-    AfkButton.Position =
-        UDim2.new(
-            0.5, -110,
-            0, 102
-        )
-
-    AfkButton.Text =
-        "ANTI-AFK: ATTIVO"
-
-    AfkButton.BackgroundColor3 =
-        Color3.fromRGB(
-            45, 110, 55
-        )
-
-    AfkButton.TextColor3 =
-        Color3.fromRGB(
-            255, 255, 255
-        )
-
+    local AfkButton = Instance.new("TextButton")
+    AfkButton.Name = "AfkButton"
+    AfkButton.Size = UDim2.new(0, 220, 0, 30)
+    AfkButton.Position = UDim2.new(0.5, -110, 0, 102)
+    AfkButton.Text = "ANTI-AFK: ATTIVO"
+    AfkButton.BackgroundColor3 = Color3.fromRGB(45, 110, 55)
+    AfkButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     AfkButton.TextSize = 12
     AfkButton.Font = Enum.Font.SourceSansBold
     AfkButton.Parent = MainFrame
 
-    local AfkCorner =
-        Instance.new("UICorner")
-
-    AfkCorner.CornerRadius =
-        UDim.new(0, 7)
-
-    AfkCorner.Parent =
-        AfkButton
+    local AfkCorner = Instance.new("UICorner")
+    AfkCorner.CornerRadius = UDim.new(0, 7)
+    AfkCorner.Parent = AfkButton
 
     AfkButton.MouseButton1Click:Connect(function()
-
-        AntiAfkAttivo =
-            not AntiAfkAttivo
-
+        AntiAfkAttivo = not AntiAfkAttivo
         if AntiAfkAttivo then
-
-            AfkButton.Text =
-                "ANTI-AFK: ATTIVO"
-
-            AfkButton.BackgroundColor3 =
-                Color3.fromRGB(
-                    45, 110, 55
-                )
-
+            AfkButton.Text = "ANTI-AFK: ATTIVO"
+            AfkButton.BackgroundColor3 = Color3.fromRGB(45, 110, 55)
         else
-
-            AfkButton.Text =
-                "ANTI-AFK: DISATTIVATO"
-
-            AfkButton.BackgroundColor3 =
-                Color3.fromRGB(
-                    130, 60, 60
-                )
+            AfkButton.Text = "ANTI-AFK: DISATTIVATO"
+            AfkButton.BackgroundColor3 = Color3.fromRGB(130, 60, 60)
         end
     end)
 
     --=====================================================
-    -- LABEL HELPER
+    -- COSTRUTTORE MODULI INFORMATIVI (LABEL)
     --=====================================================
-
-    local function makeLabel(
-        name,
-        y,
-        text
-    )
-
-        local label =
-            Instance.new("TextLabel")
-
+    local function makeLabel(name, y, text)
+        local label = Instance.new("TextLabel")
         label.Name = name
-
-        label.Size =
-            UDim2.new(
-                0, 220,
-                0, 28
-            )
-
-        label.Position =
-            UDim2.new(
-                0.5, -110,
-                0, y
-            )
-
-        label.BackgroundColor3 =
-            Color3.fromRGB(
-                43, 43, 48
-            )
-
+        label.Size = UDim2.new(0, 220, 0, 28)
+        label.Position = UDim2.new(0.5, -110, 0, y)
+        label.BackgroundColor3 = Color3.fromRGB(43, 43, 48)
         label.BorderSizePixel = 0
         label.Text = text
-
-        label.TextColor3 =
-            Color3.fromRGB(
-                230, 230, 230
-            )
-
+        label.TextColor3 = Color3.fromRGB(230, 230, 230)
         label.TextSize = 12
         label.Font = Enum.Font.SourceSansBold
         label.Parent = MainFrame
 
-        local corner =
-            Instance.new("UICorner")
-
-        corner.CornerRadius =
-            UDim.new(0, 6)
-
-        corner.Parent =
-            label
-
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = label
         return label
     end
 
-    --=====================================================
-    -- CONTATORI
-    --=====================================================
-
-    local CurrentCash =
-        makeLabel(
-            "CurrentCash",
-            143,
-            "CASH: caricamento..."
-        )
-
-    local GainSecond =
-        makeLabel(
-            "GainSecond",
-            177,
-            "GUADAGNO / SEC: +0"
-        )
-
-    local GainMinute =
-        makeLabel(
-            "GainMinute",
-            211,
-            "ULTIMI 60 SEC: +0"
-        )
-
-    local GainSession =
-        makeLabel(
-            "GainSession",
-            245,
-            "SESSIONE: +0"
-        )
-
-    local SpawnerInfo =
-        makeLabel(
-            "SpawnerInfo",
-            279,
-            "SPAWNER 50T: "
-                .. tostring(#spawnerInstances)
-        )
-
-    local LoopInfo =
-        makeLabel(
-            "LoopInfo",
-            313,
-            "LOOPS CONFIG: "
-                .. tostring(TARGET_LOOPS)
-        )
+    local CurrentCash = makeLabel("CurrentCash", 143, "CASH: caricamento...")
+    local GainSecond  = makeLabel("GainSecond", 177, "GUADAGNO / SEC: +0")
+    local GainMinute  = makeLabel("GainMinute", 211, "ULTIMI 60 SEC: +0")
+    local GainSession = makeLabel("GainSession", 245, "SESSIONE: +0")
+    local SpawnerInfo = makeLabel("SpawnerInfo", 279, "SPAWNER 50T: " .. tostring(#spawnerInstances))
+    local LoopInfo    = makeLabel("LoopInfo", 313, "LOOPS CONFIG: " .. tostring(TARGET_LOOPS))
 
     --=====================================================
-    -- CASH TRACKER READ-ONLY
+    -- MOTORE DI CALCOLO CASH TRACKER IN TEMPO REALE
     --=====================================================
-
     local trackerRunning = true
 
     task.spawn(function()
+        local leaderstats = lPlayer:WaitForChild("leaderstats", 10)
+        if not leaderstats then CurrentCash.Text = "CASH: N/D" return end
+        local cash = leaderstats:WaitForChild("Cash", 10)
+        if not cash then CurrentCash.Text = "CASH: N/D" return end
 
-        local leaderstats =
-            lPlayer:WaitForChild(
-                "leaderstats",
-                10
-            )
+        local sessionStart = tonumber(cash.Value) or 0
+        local previousCash = sessionStart
+        local history = {{time = os.clock(), cash = sessionStart}}
 
-        if not leaderstats then
-            CurrentCash.Text = "CASH: N/D"
-            return
-        end
-
-        local cash =
-            leaderstats:WaitForChild(
-                "Cash",
-                10
-            )
-
-        if not cash then
-            CurrentCash.Text = "CASH: N/D"
-            return
-        end
-
-        local sessionStart =
-            tonumber(cash.Value) or 0
-
-        local previousCash =
-            sessionStart
-
-        local history = {
-            {
-                time = os.clock(),
-                cash = sessionStart
-            }
-        }
-
-        while
-            trackerRunning
-            and ScreenGui.Parent
-            and cash.Parent
-        do
-
+        while trackerRunning and ScreenGui.Parent and cash.Parent do
             task.wait(1)
+            local now = os.clock()
+            local current = tonumber(cash.Value) or previousCash
+            local secondDelta = current - previousCash
+            previousCash = current
 
-            local now =
-                os.clock()
+            table.insert(history, {time = now, cash = current})
 
-            local current =
-                tonumber(cash.Value)
-                or previousCash
-
-            local secondDelta =
-                current - previousCash
-
-            previousCash =
-                current
-
-            table.insert(
-                history,
-                {
-                    time = now,
-                    cash = current
-                }
-            )
-
-            while
-                #history > 1
-                and
-                now - history[1].time > 60
-            do
-
-                table.remove(
-                    history,
-                    1
-                )
+            while #history > 1 and now - history[1].time > 60 do
+                table.remove(history, 1)
             end
 
-            local minuteDelta =
-                current
-                - history[1].cash
+            local minuteDelta = current - history[1].cash
+            local sessionDelta = current - sessionStart
 
-            local sessionDelta =
-                current
-                - sessionStart
-
-            CurrentCash.Text =
-                "CASH: "
-                .. formatNumber(current)
-
-            GainSecond.Text =
-                "GUADAGNO / SEC: "
-                .. signedNumber(secondDelta)
-
-            GainMinute.Text =
-                "ULTIMI 60 SEC: "
-                .. signedNumber(minuteDelta)
-
-            GainSession.Text =
-                "SESSIONE: "
-                .. signedNumber(sessionDelta)
+            CurrentCash.Text = "CASH: " .. formatNumber(current)
+            GainSecond.Text = "GUADAGNO / SEC: " .. signedNumber(secondDelta)
+            GainMinute.Text = "ULTIMI 60 SEC: " .. signedNumber(minuteDelta)
+            GainSession.Text = "SESSIONE: " .. signedNumber(sessionDelta)
         end
     end)
 
     --=====================================================
-    -- MINIMIZZA
+    -- GESTIONE BOTTONE MINIMIZZA (— / +)
     --=====================================================
-
     local minimized = false
-
-    local MinButton =
-        Instance.new("TextButton")
-
-    MinButton.Name =
-        "MinButton"
-
-    MinButton.Size =
-        UDim2.new(
-            0, 28,
-            0, 25
-        )
-
-    MinButton.Position =
-        UDim2.new(
-            1, -64,
-            0, 5
-        )
-
-    MinButton.BackgroundColor3 =
-        Color3.fromRGB(
-            75, 75, 80
-        )
-
+    local MinButton = Instance.new("TextButton")
+    MinButton.Name = "MinButton"
+    MinButton.Size = UDim2.new(0, 28, 0, 25)
+    MinButton.Position = UDim2.new(1, -64, 0, 5)
+    MinButton.BackgroundColor3 = Color3.fromRGB(75, 75, 80)
     MinButton.Text = "—"
-
-    MinButton.TextColor3 =
-        Color3.fromRGB(
-            255, 255, 255
-        )
-
+    MinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     MinButton.TextSize = 18
     MinButton.Font = Enum.Font.SourceSansBold
     MinButton.ZIndex = 10
     MinButton.Parent = MainFrame
 
-    local MinCorner =
-        Instance.new("UICorner")
-
-    MinCorner.CornerRadius =
-        UDim.new(0, 6)
-
-    MinCorner.Parent =
-        MinButton
+    local MinCorner = Instance.new("UICorner")
+    MinCorner.CornerRadius = UDim.new(0, 6)
+    MinCorner.Parent = MinButton
 
     --=====================================================
-    -- CHIUDI
+    -- GESTIONE BOTTONE CHIUDI (×)
     --=====================================================
-
-    local CloseButton =
-        Instance.new("TextButton")
-
-    CloseButton.Name =
-        "CloseButton"
-
-    CloseButton.Size =
-        UDim2.new(
-            0, 28,
-            0, 25
-        )
-
-    CloseButton.Position =
-        UDim2.new(
-            1, -32,
-            0, 5
-        )
-
-    CloseButton.BackgroundColor3 =
-        Color3.fromRGB(
-            190, 50, 50
-        )
-
+    local CloseButton = Instance.new("TextButton")
+    CloseButton.Name = "CloseButton"
+    CloseButton.Size = UDim2.new(0, 28, 0, 25)
+    CloseButton.Position = UDim2.new(1, -32, 0, 5)
+    CloseButton.BackgroundColor3 = Color3.fromRGB(190, 50, 50)
     CloseButton.Text = "×"
-
-    CloseButton.TextColor3 =
-        Color3.fromRGB(
-            255, 255, 255
-        )
-
+    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     CloseButton.TextSize = 18
     CloseButton.Font = Enum.Font.SourceSansBold
     CloseButton.ZIndex = 10
     CloseButton.Parent = MainFrame
 
-    local CloseCorner =
-        Instance.new("UICorner")
-
-    CloseCorner.CornerRadius =
-        UDim.new(0, 6)
-
-    CloseCorner.Parent =
-        CloseButton
-
+    local CloseCorner = Instance.new("UICorner")
+    CloseCorner.CornerRadius = UDim.new(0, 6)
+    CloseCorner.Parent = CloseButton
     --=====================================================
-    -- CONTENUTO DA NASCONDERE
+    -- CONFIGURAZIONE STRUTTURALE CONTENUTI GUI
     --=====================================================
-
     local content = {
-        FarmButton,
-        AfkButton,
+        FarmButton, 
+        AfkButton, 
         CurrentCash,
-        GainSecond,
-        GainMinute,
+        GainSecond, 
+        GainMinute, 
         GainSession,
-        SpawnerInfo,
+        SpawnerInfo, 
         LoopInfo
     }
 
+    -- Gestione interattiva pulsante riduci/espandi
     MinButton.MouseButton1Click:Connect(function()
-
-        minimized =
-            not minimized
-
+        minimized = not minimized
         if minimized then
-
-            MainFrame.Size =
-                UDim2.new(
-                    0, 260,
-                    0, 36
-                )
-
-            for _, object
-                in ipairs(content)
-            do
-
-                object.Visible =
-                    false
+            MainFrame.Size = UDim2.new(0, 260, 0, 36)
+            for i = 1, #content do
+                local object = content[i]
+                if object then object.Visible = false end
             end
-
-            MinButton.Text =
-                "+"
-
+            MinButton.Text = "+"
         else
-
-            MainFrame.Size =
-                UDim2.new(
-                    0, 260,
-                    0, 350
-                )
-
-            for _, object
-                in ipairs(content)
-            do
-
-                object.Visible =
-                    true
+            MainFrame.Size = UDim2.new(0, 260, 0, 350)
+            for i = 1, #content do
+                local object = content[i]
+                if object then object.Visible = true end
             end
-
-            MinButton.Text =
-                "—"
+            MinButton.Text = "—"
         end
     end)
 
     --=====================================================
-    -- CHIUSURA PULITA
+    -- CHIUSURA PULITA E DISCONNESSIONE EVENTI
     --=====================================================
-
     CloseButton.MouseButton1Click:Connect(function()
-
-        _G.FarmingAttivo =
-            false
-
-        trackerRunning =
-            false
-
-        dragging =
-            false
-
-        if dragConnection then
-            dragConnection:Disconnect()
+        _G.FarmingAttivo = false
+        trackerRunning = false
+        dragging = false
+        
+        -- Sgancia i collegamenti per evitare memory leak su Delta
+        if dragConnection then 
+            dragConnection:Disconnect() 
         end
-
+        if idleConnection then 
+            idleConnection:Disconnect() 
+        end
+        
         ScreenGui:Destroy()
-
-        print("[GUI] Manager chiuso.")
+        print("[GUI] Manager rimosso con successo dal DataModel.")
     end)
 
-    print(
-        "[GUI] TRIXADE 50T MANAGER caricata."
-    )
+    print("[GUI] Interfaccia caricata in PlayerGui.")
 end
 
---=========================================================
--- ESECUZIONE COMPLESSIVA
---=========================================================
-
-InizializzaAntiAFK()
-CreaInterfaccia()
-
-print("[SYSTEM] GUI creata correttamente.")
+--===================================================================================
+-- ESECUZIONE STRUTTURALE GLOBALE
+--===================================================================================
+if #spawnerInstances > 0 then
+    InizializzaAntiAFK()
+    CreaInterfaccia()
+    print("[SYSTEM] TrixAde 50T fully operational.")
+else
+    warn("[SYSTEM] Spawner assenti. Caricamento interfaccia in modalità standby.")
+    InizializzaAntiAFK()
+    CreaInterfaccia()
+end
