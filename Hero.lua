@@ -42,20 +42,15 @@ local function runRoutine(targetSpawner)
     if not hrp then return end
     
     hrp.CFrame = targetSpawner.CFrame
-    task.wait(0.2) 
+    task.wait(0.15)
     
-    local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AskCoin")
-    
-    local cicliMobile = 100
-    for i = 1, cicliMobile do
+    for i = 1, 250 do
         if not _G.FarmingAttivo then break end
         
-        remote:FireServer(targetSpawner)
-        
-        task.wait(0.01)
+        askCoinRemote:FireServer(targetSpawner)
+        RunService.Heartbeat:Wait()
     end
 end
-
 
 -- Dichiarazione globale per essere letta dai pulsanti della GUI sotto
 function AvviaLoopFarming()
