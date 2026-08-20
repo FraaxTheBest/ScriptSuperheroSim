@@ -36,27 +36,26 @@ print("[CORE] Spawner 50T agganciati nel server:", #spawnerInstances)
 --===================================================================================
 -- LOGICA DI RACCOLTA MONETE 
 --===================================================================================
-local farmingThreadAttivo = false
-
 local function runRoutine(targetSpawner)
     local char = lPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
     hrp.CFrame = targetSpawner.CFrame
-    task.wait(0.1)
+    task.wait(0.2) 
     
     local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AskCoin")
     
-    for i = 1, TARGET_LOOPS do
+    local cicliMobile = 100
+    for i = 1, cicliMobile do
         if not _G.FarmingAttivo then break end
+        
         remote:FireServer(targetSpawner)
         
-        if i % 25 == 0 then
-            task.wait(0.01)
-        end
+        task.wait(0.01)
     end
 end
+
 
 -- Dichiarazione globale per essere letta dai pulsanti della GUI sotto
 function AvviaLoopFarming()
