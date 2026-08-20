@@ -393,15 +393,14 @@ local function CreaInterfaccia()
     CloseButton.MouseButton1Click:Connect(function()
         _G.FarmingAttivo = false
         trackerRunning = false
-        dragging = false
         
-        -- Sgancia i collegamenti per evitare memory leak su Delta
-        if dragConnection then 
-            dragConnection:Disconnect() 
-        end
-        if idleConnection then 
-            idleConnection:Disconnect() 
-        end
+        -- Chiusura sicura senza crash da variabili nil
+        pcall(function()
+            if dragConnection then dragConnection:Disconnect() end
+        end)
+        pcall(function()
+            if idleConnection then idleConnection:Disconnect() end
+        end)
         
         ScreenGui:Destroy()
         print("[GUI] Manager rimosso con successo dal DataModel.")
