@@ -1,49 +1,93 @@
+
 --===================================================================================
--- ENGINE AUTO-ATTACK PROTETTO (KILL AURA DISTANZIATO)
--- Identifica i nemici e simula l'impatto dell'arma senza esporre il player
+-- CONFIGURAZIONE ENGINE, FARMING LOOP, ANTI-AFK E MOTORE ECONOMICO
 --===================================================================================
 
-_G.AutoKillMobs = false
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
-local function AvviaAutoKill()
-    task.spawn(function()
-        print("[KILL ENGINE] Scansione nemici avviata.")
-        while _G.AutoKillMobs do
-            local char = lPlayer.Character
-            local tool = char and char:FindFirstChildOfClass("Tool")
-            local weaponPart = tool and (tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart", true))
-            
-            -- Sfrutta il corpo del personaggio se l'arma non è equipaggiata
-            local attackSource = weaponPart or (char and char:FindFirstChild("HumanoidRootPart"))
-            
-            if attackSource then
-                -- Scansione lineare del Workspace per isolare i bersagli vivi
-                for _, obj in ipairs(workspace:GetChildren()) do
-                    if not _G.AutoKillMobs then break end
-                    
-                    local hum = obj:FindFirstChildOfClass("Humanoid")
-                    local root = obj:FindFirstChild("HumanoidRootPart")
-                    
-                    -- Verifica che sia un NPC nemico valido e che abbia vita sul server
-                    if hum and root and obj.Name ~= lPlayer.Name and hum.Health > 0 then
-                        -- Genera un ciclo rapido di 10 colpi simulati per frame sul bersaglio attuale
-                        for colpo = 1, 10 do
-                            if hum.Health <= 0 or not _G.AutoKillMobs then break end
-                            pcall(function()
-                                firetouchinterest(root, attackSource, 0) -- Avvia contatto fisico
-                                firetouchinterest(root, attackSource, 1) -- Conclude contatto fisico
-                            end)
-                        end
-                    end
-                end
-            end
-            -- Pausa di 0.05 secondi per prevenire il congelamento dell'app Delta su mobile
-            task.wait(0.05)
-        end
-        print("[KILL ENGINE] Scansione nemici interrotta.")
-    end)
+local lPlayer = Players.LocalPlayer
+local pGui = lPlayer:WaitForChild("PlayerGui")
+local askCoinRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AskCoin")
+
+_G.FarmingAttivo = false
+local TARGET_LOOPS = 250
+local SPAWNER_NAME = "50000000000000"
+
+--===================================================================================
+-- CARTELLA SPAWNER E LOGICA DI INDIVIDUAZIONE
+--===================================================================================
+local spawnersFolder = Workspace:WaitForChild("CoinSpawners")
+local spawnerInstances = {}
+local children = spawnersFolder:GetChildren()
+
+for i = 1, #children do
+    local child = children[i]
+    if child.Name == SPAWNER_NAME and child:IsA("BasePart") then
+        table.insert(spawnerInstances, child)
+    end
 end
 
+print("[CORE] Spawner 50T agganciati nel server:", #spawnerInstances)
+
+--===================================================================================
+-- LOGICA DI RACCOLTA MONETE 
+--===================================================================================
+local function runRoutine(targetSpawner)
+    local char = lPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    -- Allineamento e brevissima attesa di posizionamento
+    hrp.CFrame = targetSpawner.CFrame
+    task.wait(0.1) 
+    
+    local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AskCoin")
+    
+    -- Massima raffica mobile (1.000 colpi = 50Qa a fermata)
+    local cicliMassimi = 1000
+    for i = 1, cicliMassimi do
+        if not _G.FarmingAttivo then break end
+        
+        remote:FireServer(targetSpawner)
+        
+        -- Rilascia il thread solo 1 frame ogni 100 colpi per non far crashare l'app Delta
+        if i % 100 == 0 then
+            task.wait()
+        end
+    end
+end
+
+-- Dichiarazione globale per i pulsanti della GUI sotto
+function AvviaLoopFarming()
+    if farmingThreadAttivo then return end
+    farmingThreadAttivo = true
+
+    task.spawn(function()
+        print("[CORE] Loop farming ultra-caricato avviato.")
+        while _G.FarmingAttivo do
+            for idx = 1, #spawnerInstances do
+                if not _G.FarmingAttivo then break end
+                local target = spawnerInstances[idx]
+                print("[CORE] Target 50T #" .. tostring(idx))
+                runRoutine(target)
+                task.wait(0.2) -- Ridotto il tempo di spostamento tra gli spawner
+            end
+            
+            -- VELOCIZZAZIONE COMPLETA: Ripetizione immediata della zona
+            if _G.FarmingAttivo then
+                task.wait(0.1) -- Cooldown azzerato al minimo per massimizzare i pacchetti
+            else
+                break
+            end
+        end
+        farmingThreadAttivo = false
+        print("[CORE] Loop farming terminato.")
+    end)
+end
 
 --===================================================================================
 -- PROTEZIONE ANTI-AFK REALE (PREVENZIONE KICK 20 MINUTI)
