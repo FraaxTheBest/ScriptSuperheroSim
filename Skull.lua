@@ -1,6 +1,5 @@
 --===================================================================================
--- TRIXADE ULTIMATE SKULL & MOB MANAGER
--- CODICE UNIFICATO COMPLETO - NESSUNA PARTE MANCANTE
+-- TRIXADE AUTO-KILL, SKULL MAGNET & AUTO-SELL INFINE ENGINE
 --===================================================================================
 
 local Players = game:GetService("Players")
@@ -13,10 +12,9 @@ local lPlayer = Players.LocalPlayer
 local pGui = lPlayer:WaitForChild("PlayerGui")
 
 _G.FarmingAttivo = false
-local TARGET_LOOPS = 250
 
 --===================================================================================
--- SISTEMA DI FORMATTAZIONE NUMERICA ECONOMY COMPLETA
+-- FORMATTAZIONE NUMERICA ECONOMY COMPLETA
 -- K, M, B, T, Qa, Qi, Sx, Sp, Oc
 --===================================================================================
 
@@ -58,51 +56,77 @@ local function signedNumber(n)
 end
 
 --===================================================================================
--- COMBAT ENGINE HYPER-BURST POWER SPAMMING (BRUTE PUNCH / DUAL KNIVES FIX)
--- Forza l'invio di 2000 attacchi simulando la mossa equipaggiata sui Criminal
+-- COMBAT CORE + SKULL MAGNET + AUTO SELL VIA NETWORKING
 --===================================================================================
-local skullThreadAttivo = false
-local animHitRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AnimHit")
-local petAttackRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("PetAttack")
 
--- Funzione asincrona che bombarda il server con la mossa attiva
-local function scaricaColpiFlash(target)
-    for colpo = 1, 200 do
-        if target.Parent == nil or not _G.FarmingAttivo then break end
-        local hum = target:FindFirstChildOfClass("Humanoid")
-        if hum and hum.Health <= 0 then break end
-        
-        pcall(function()
-            -- Spara l'attacco dell'eroe configurando l'argomento corretto richiesto dal server
-            animHitRemote:FireServer(target, "Attack") 
-            animHitRemote:FireServer(target, "Punch")
-            animHitRemote:FireServer(target, "BrutePunch")
-            
-            -- Spara l'attacco simultaneo dei pet per raddoppiare la frequenza
-            petAttackRemote:FireServer(target)
-        end)
+local skullThreadAttivo = false
+
+local animHitRemote = ReplicatedStorage
+    :WaitForChild("Remotes")
+    :WaitForChild("AnimHit")
+
+local petAttackRemote = ReplicatedStorage
+    :WaitForChild("Remotes")
+    :WaitForChild("PetAttack")
+
+local function eseguiAutoSell(hrp)
+    local remotes = ReplicatedStorage:WaitForChild("Remotes")
+
+    local sellRemote =
+        remotes:FindFirstChild("Sell")
+        or remotes:FindFirstChild("SellBricks")
+
+    if sellRemote and sellRemote:IsA("RemoteEvent") then
+        sellRemote:FireServer()
+    else
+        local sellPart =
+            Workspace:FindFirstChild("Sell")
+            or Workspace:FindFirstChild("SellPart")
+            or Workspace:FindFirstChild("SellArea")
+
+        if sellPart and sellPart:IsA("BasePart") then
+            local vecchiaPos = hrp.CFrame
+
+            hrp.CFrame = sellPart.CFrame
+            task.wait(0.1)
+            hrp.CFrame = vecchiaPos
+        end
     end
 end
 
 local function runUltimateCombo()
     local char = lPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    
+
+    if not hrp then
+        return
+    end
+
     local bersaglioVicino = nil
     local distanzaMinima = math.huge
-    
-    -- Scansione profonda per isolare i Criminal vivi
+
     local function controllaModello(obj)
         local hum = obj:FindFirstChildOfClass("Humanoid")
-        -- Correzione: Cerca HumanoidRootPart in modo sicuro senza far crashare lo script se è nil
-        local mRoot = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChildWhichIsA("BasePart", true)
-        
-        if hum and mRoot and hum.Health > 0 and obj.Name ~= lPlayer.Name then
+
+        local mRoot =
+            obj:FindFirstChild("HumanoidRootPart")
+            or obj:FindFirstChildWhichIsA("BasePart", true)
+
+        if hum
+            and mRoot
+            and hum.Health > 0
+            and obj.Name ~= lPlayer.Name
+        then
             local nomeLower = obj.Name:lower()
-            if nomeLower:match("criminal") or nomeLower:match("droid") or obj.Parent.Name:lower():match("mobs") then
+
+            if nomeLower:match("criminal")
+                or nomeLower:match("droid")
+                or obj.Parent.Name:lower():match("mobs")
+            then
                 if not game.Players:GetPlayerFromCharacter(obj) then
-                    local distanza = (hrp.Position - mRoot.Position).Magnitude
+                    local distanza =
+                        (hrp.Position - mRoot.Position).Magnitude
+
                     if distanza < distanzaMinima then
                         distanzaMinima = distanza
                         bersaglioVicino = obj
@@ -112,68 +136,140 @@ local function runUltimateCombo()
         end
     end
 
+    -- Scansione Workspace principale
     local oggettiWorkspace = workspace:GetChildren()
+
     for i = 1, #oggettiWorkspace do
         controllaModello(oggettiWorkspace[i])
     end
-    
+
+    -- Scansione cartella Mobs
     local cartellaMobs = workspace:FindFirstChild("Mobs")
+
     if cartellaMobs then
         local oggettiMobs = cartellaMobs:GetChildren()
+
         for i = 1, #oggettiMobs do
             controllaModello(oggettiMobs[i])
         end
     end
-    
-    -- Esecuzione blocco e scarica di rete da 2000 colpi
+
+    -- Attacco bersaglio più vicino
     if bersaglioVicino and _G.FarmingAttivo then
-        local mRoot = bersaglioVicino:FindFirstChild("HumanoidRootPart") or bersaglioVicino:FindFirstChildWhichIsA("BasePart", true)
+        local mRoot =
+            bersaglioVicino:FindFirstChild("HumanoidRootPart")
+            or bersaglioVicino:FindFirstChildWhichIsA(
+                "BasePart",
+                true
+            )
+
         if mRoot then
             pcall(function()
-                -- Trascina e blocca il Criminal a 3 studs davanti a te
-                mRoot.CFrame = hrp.CFrame * CFrame.new(0, 0, -3)
+                -- Teletrasporta il nemico davanti al giocatore
+                mRoot.CFrame =
+                    hrp.CFrame * CFrame.new(0, 0, -3)
             end)
-            
-            -- Sgancia 10 thread asincroni paralleli per generare la raffica massima
+
             for thread = 1, 10 do
-                task.spawn(scaricaColpiFlash, bersaglioVicino)
+                task.spawn(function()
+                    for colpo = 1, 200 do
+                        if bersaglioVicino.Parent == nil
+                            or not _G.FarmingAttivo
+                        then
+                            break
+                        end
+
+                        pcall(function()
+                            animHitRemote:FireServer(
+                                bersaglioVicino,
+                                "BrutePunch"
+                            )
+
+                            petAttackRemote:FireServer(
+                                bersaglioVicino
+                            )
+                        end)
+                    end
+                end)
             end
         end
     end
-    
-    -- Calamita automatica dei teschi rilasciati
+
+    --=========================================================
+    -- SKULL / DROP MAGNET
+    --=========================================================
+
     local drops = workspace:GetChildren()
+    local teschioTrovato = false
+
     for j = 1, #drops do
-        if not _G.FarmingAttivo then break end
+        if not _G.FarmingAttivo then
+            break
+        end
+
         local obj = drops[j]
-        
-        if obj:IsA("Model") or obj:IsA("BasePart") or obj:IsA("MeshPart") then
+
+        if obj:IsA("Model")
+            or obj:IsA("BasePart")
+            or obj:IsA("MeshPart")
+        then
             local nameLower = obj.Name:lower()
-            if nameLower:match("drop") or nameLower:match("skull") or nameLower:match("teschio") or nameLower:match("reward") then
-                local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart", true)
+
+            if nameLower:match("drop")
+                or nameLower:match("skull")
+                or nameLower:match("teschio")
+                or nameLower:match("reward")
+            then
+                local part
+
+                if obj:IsA("BasePart") then
+                    part = obj
+                else
+                    part =
+                        obj:FindFirstChildWhichIsA(
+                            "BasePart",
+                            true
+                        )
+                end
+
                 if part then
                     part.CFrame = hrp.CFrame
+                    teschioTrovato = true
                 end
             end
         end
     end
+
+    -- Auto Sell quando viene trovato almeno un drop
+    if teschioTrovato then
+        eseguiAutoSell(hrp)
+    end
 end
 
+--===================================================================================
+-- LOOP FARMING PRINCIPALE
+--===================================================================================
+
 function AvviaLoopFarming()
-    if skullThreadAttivo then return end
+    if skullThreadAttivo then
+        return
+    end
+
     skullThreadAttivo = true
 
     task.spawn(function()
-        print("[HYPER SPAMMING CORE] Attacco forzato mosse speciali e calamita attivi.")
+        print("[SKULL GENERATOR] Motore attivo.")
+
         while _G.FarmingAttivo do
             pcall(runUltimateCombo)
             task.wait(0.03)
         end
+
         skullThreadAttivo = false
-        print("[HYPER SPAMMING CORE] Ciclo terminato.")
+
+        print("[SKULL GENERATOR] Terminato.")
     end)
 end
-
 
 --===================================================================================
 -- PROTEZIONE ANTI-AFK
@@ -213,16 +309,26 @@ end
 
 local function CreaInterfaccia()
     local screenName = "SuperheroSim_Mobs_Gui"
-    local vecchioScreen = pGui:FindFirstChild(screenName)
+
+    local vecchioScreen =
+        pGui:FindFirstChild(screenName)
 
     if vecchioScreen then
         vecchioScreen:Destroy()
     end
 
+    --=========================================================
+    -- SCREEN GUI
+    --=========================================================
+
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = screenName
     ScreenGui.ResetOnSpawn = false
     ScreenGui.Parent = pGui
+
+    --=========================================================
+    -- MAIN FRAME
+    --=========================================================
 
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
@@ -237,13 +343,16 @@ local function CreaInterfaccia()
     FrameCorner.CornerRadius = UDim.new(0, 10)
     FrameCorner.Parent = MainFrame
 
-    -- Titolo
+    --=========================================================
+    -- TITLE
+    --=========================================================
+
     local Title = Instance.new("TextLabel")
     Title.Name = "Title"
     Title.Size = UDim2.new(1, 0, 0, 36)
     Title.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
     Title.BorderSizePixel = 0
-    Title.Text = "TRIXADE MOB MANAGER"
+    Title.Text = "TRIXADE SKULL GENERATOR"
     Title.TextColor3 = Color3.fromRGB(255, 215, 0)
     Title.TextSize = 14
     Title.Font = Enum.Font.SourceSansBold
@@ -254,7 +363,10 @@ local function CreaInterfaccia()
     TitleCorner.CornerRadius = UDim.new(0, 10)
     TitleCorner.Parent = Title
 
-    -- Sistema drag
+    --=========================================================
+    -- DRAG GUI
+    --=========================================================
+
     local dragging
     local dragInput
     local dragStart
@@ -269,7 +381,9 @@ local function CreaInterfaccia()
             startPos = MainFrame.Position
 
             input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
+                if input.UserInputState
+                    == Enum.UserInputState.End
+                then
                     dragging = false
                 end
             end)
@@ -277,37 +391,49 @@ local function CreaInterfaccia()
     end)
 
     Title.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-            or input.UserInputType == Enum.UserInputType.Touch
+        if input.UserInputType
+            == Enum.UserInputType.MouseMovement
+            or input.UserInputType
+                == Enum.UserInputType.Touch
         then
             dragInput = input
         end
     end)
 
-    local dragConnection = UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput
-            and dragging
-            and MainFrame.Parent
-        then
-            local delta = input.Position - dragStart
+    local dragConnection =
+        UserInputService.InputChanged:Connect(function(input)
+            if input == dragInput
+                and dragging
+                and MainFrame.Parent
+            then
+                local delta =
+                    input.Position - dragStart
 
-            MainFrame.Position = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
-            )
-        end
-    end)
+                MainFrame.Position =
+                    UDim2.new(
+                        startPos.X.Scale,
+                        startPos.X.Offset + delta.X,
+                        startPos.Y.Scale,
+                        startPos.Y.Offset + delta.Y
+                    )
+            end
+        end)
 
-    -- Pulsante START / STOP FARMING
+    --=========================================================
+    -- FARM BUTTON
+    --=========================================================
+
     local FarmButton = Instance.new("TextButton")
     FarmButton.Name = "FarmButton"
     FarmButton.Size = UDim2.new(0, 220, 0, 42)
     FarmButton.Position = UDim2.new(0.5, -110, 0, 50)
-    FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    FarmButton.Text = "ULTIMATE MOB: SPENTO"
-    FarmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    FarmButton.BackgroundColor3 =
+        Color3.fromRGB(200, 50, 50)
+
+    FarmButton.Text = "SKULL GENERATOR: SPENTO"
+    FarmButton.TextColor3 =
+        Color3.fromRGB(255, 255, 255)
+
     FarmButton.TextSize = 14
     FarmButton.Font = Enum.Font.SourceSansBold
     FarmButton.Parent = MainFrame
@@ -317,27 +443,44 @@ local function CreaInterfaccia()
     FarmCorner.Parent = FarmButton
 
     FarmButton.MouseButton1Click:Connect(function()
-        _G.FarmingAttivo = not _G.FarmingAttivo
+        _G.FarmingAttivo =
+            not _G.FarmingAttivo
 
         if _G.FarmingAttivo then
-            FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-            FarmButton.Text = "ULTIMATE MOB: ATTIVO ⚔️💀"
+            FarmButton.BackgroundColor3 =
+                Color3.fromRGB(50, 180, 50)
+
+            FarmButton.Text =
+                "GENERATOR: ATTIVO 💀⚡"
 
             AvviaLoopFarming()
         else
-            FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-            FarmButton.Text = "ULTIMATE MOB: SPENTO"
+            FarmButton.BackgroundColor3 =
+                Color3.fromRGB(200, 50, 50)
+
+            FarmButton.Text =
+                "SKULL GENERATOR: SPENTO"
         end
     end)
 
-    -- Pulsante ANTI-AFK
+    --=========================================================
+    -- ANTI-AFK BUTTON
+    --=========================================================
+
     local AfkButton = Instance.new("TextButton")
     AfkButton.Name = "AfkButton"
     AfkButton.Size = UDim2.new(0, 220, 0, 30)
-    AfkButton.Position = UDim2.new(0.5, -110, 0, 102)
+    AfkButton.Position =
+        UDim2.new(0.5, -110, 0, 102)
+
     AfkButton.Text = "ANTI-AFK: ATTIVO"
-    AfkButton.BackgroundColor3 = Color3.fromRGB(45, 110, 55)
-    AfkButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+    AfkButton.BackgroundColor3 =
+        Color3.fromRGB(45, 110, 55)
+
+    AfkButton.TextColor3 =
+        Color3.fromRGB(255, 255, 255)
+
     AfkButton.TextSize = 12
     AfkButton.Font = Enum.Font.SourceSansBold
     AfkButton.Parent = MainFrame
@@ -347,97 +490,139 @@ local function CreaInterfaccia()
     AfkCorner.Parent = AfkButton
 
     AfkButton.MouseButton1Click:Connect(function()
-        AntiAfkAttivo = not AntiAfkAttivo
+        AntiAfkAttivo =
+            not AntiAfkAttivo
 
         if AntiAfkAttivo then
-            AfkButton.Text = "ANTI-AFK: ATTIVO"
-            AfkButton.BackgroundColor3 = Color3.fromRGB(45, 110, 55)
+            AfkButton.Text =
+                "ANTI-AFK: ATTIVO"
+
+            AfkButton.BackgroundColor3 =
+                Color3.fromRGB(45, 110, 55)
         else
-            AfkButton.Text = "ANTI-AFK: DISATTIVATO"
-            AfkButton.BackgroundColor3 = Color3.fromRGB(130, 60, 60)
+            AfkButton.Text =
+                "ANTI-AFK: DISATTIVATO"
+
+            AfkButton.BackgroundColor3 =
+                Color3.fromRGB(130, 60, 60)
         end
     end)
 
-    -- Costruttore Moduli Label
+    --=========================================================
+    -- LABEL GENERATOR
+    --=========================================================
+
     local function makeLabel(name, y, text)
-        local label = Instance.new("TextLabel")
+        local label =
+            Instance.new("TextLabel")
+
         label.Name = name
-        label.Size = UDim2.new(0, 220, 0, 28)
-        label.Position = UDim2.new(0.5, -110, 0, y)
-        label.BackgroundColor3 = Color3.fromRGB(43, 43, 48)
+        label.Size =
+            UDim2.new(0, 220, 0, 28)
+
+        label.Position =
+            UDim2.new(0.5, -110, 0, y)
+
+        label.BackgroundColor3 =
+            Color3.fromRGB(43, 43, 48)
+
         label.BorderSizePixel = 0
         label.Text = text
-        label.TextColor3 = Color3.fromRGB(230, 230, 230)
+
+        label.TextColor3 =
+            Color3.fromRGB(230, 230, 230)
+
         label.TextSize = 12
         label.Font = Enum.Font.SourceSansBold
         label.Parent = MainFrame
 
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 6)
+        local corner =
+            Instance.new("UICorner")
+
+        corner.CornerRadius =
+            UDim.new(0, 6)
+
         corner.Parent = label
 
         return label
     end
 
-    local CurrentCash = makeLabel(
-        "CurrentCash",
-        143,
-        "CASH: caricamento..."
-    )
+    local CurrentCash =
+        makeLabel(
+            "CurrentCash",
+            143,
+            "CASH: caricamento..."
+        )
 
-    local GainSecond = makeLabel(
-        "GainSecond",
-        177,
-        "GUADAGNO / SEC: +0"
-    )
+    local GainSecond =
+        makeLabel(
+            "GainSecond",
+            177,
+            "GUADAGNO / SEC: +0"
+        )
 
-    local GainMinute = makeLabel(
-        "GainMinute",
-        211,
-        "ULTIMI 60 SEC: +0"
-    )
+    local GainMinute =
+        makeLabel(
+            "GainMinute",
+            211,
+            "ULTIMI 60 SEC: +0"
+        )
 
-    local GainSession = makeLabel(
-        "GainSession",
-        245,
-        "SESSIONE: +0"
-    )
+    local GainSession =
+        makeLabel(
+            "GainSession",
+            245,
+            "SESSIONE: +0"
+        )
 
-    local StatusInfo1 = makeLabel(
-        "StatusInfo1",
-        279,
-        "TARGETING: BATTLE DROID (100T)"
-    )
+    local StatusInfo1 =
+        makeLabel(
+            "StatusInfo1",
+            279,
+            "TARGETING: BATTLE DROID (100T)"
+        )
 
-    local StatusInfo2 = makeLabel(
-        "StatusInfo2",
-        313,
-        "MODULO: SPAM ANIMHIT + MAGNETE"
-    )
+    local StatusInfo2 =
+        makeLabel(
+            "StatusInfo2",
+            313,
+            "MODULO: ULTRA SPAM + AUTO-SELL"
+        )
 
-    --=====================================================
-    -- MOTORE CASH TRACKER
-    --=====================================================
+    --=========================================================
+    -- CASH TRACKER
+    --=========================================================
 
     local trackerRunning = true
 
     task.spawn(function()
-        local leaderstats = lPlayer:WaitForChild("leaderstats", 10)
+        local leaderstats =
+            lPlayer:WaitForChild(
+                "leaderstats",
+                10
+            )
 
         if not leaderstats then
             CurrentCash.Text = "CASH: N/D"
             return
         end
 
-        local cash = leaderstats:WaitForChild("Cash", 10)
+        local cash =
+            leaderstats:WaitForChild(
+                "Cash",
+                10
+            )
 
         if not cash then
             CurrentCash.Text = "CASH: N/D"
             return
         end
 
-        local sessionStart = tonumber(cash.Value) or 0
-        local previousCash = sessionStart
+        local sessionStart =
+            tonumber(cash.Value) or 0
+
+        local previousCash =
+            sessionStart
 
         local history = {
             {
@@ -453,80 +638,131 @@ local function CreaInterfaccia()
             task.wait(1)
 
             local now = os.clock()
-            local current = tonumber(cash.Value) or previousCash
-            local secondDelta = current - previousCash
+
+            local current =
+                tonumber(cash.Value)
+                or previousCash
+
+            local secondDelta =
+                current - previousCash
 
             previousCash = current
 
-            table.insert(history, {
-                time = now,
-                cash = current
-            })
+            table.insert(
+                history,
+                {
+                    time = now,
+                    cash = current
+                }
+            )
 
+            -- Tiene solo gli ultimi 60 secondi
             while #history > 1
                 and now - history[1].time > 60
             do
                 table.remove(history, 1)
             end
 
-            local minuteDelta = current - history[1].cash
-            local sessionDelta = current - sessionStart
+            local minuteDelta =
+                current - history[1].cash
+
+            local sessionDelta =
+                current - sessionStart
 
             CurrentCash.Text =
-                "CASH: " .. formatNumber(current)
+                "CASH: "
+                .. formatNumber(current)
 
             GainSecond.Text =
-                "GUADAGNO / SEC: " .. signedNumber(secondDelta)
+                "GUADAGNO / SEC: "
+                .. signedNumber(secondDelta)
 
             GainMinute.Text =
-                "ULTIMI 60 SEC: " .. signedNumber(minuteDelta)
+                "ULTIMI 60 SEC: "
+                .. signedNumber(minuteDelta)
 
             GainSession.Text =
-                "SESSIONE: " .. signedNumber(sessionDelta)
+                "SESSIONE: "
+                .. signedNumber(sessionDelta)
         end
     end)
 
-    --=====================================================
-    -- BOTTONE MINIMIZZA
-    --=====================================================
+    --=========================================================
+    -- MINIMIZE BUTTON
+    --=========================================================
 
     local minimized = false
 
-    local MinButton = Instance.new("TextButton")
+    local MinButton =
+        Instance.new("TextButton")
+
     MinButton.Name = "MinButton"
-    MinButton.Size = UDim2.new(0, 28, 0, 25)
-    MinButton.Position = UDim2.new(1, -64, 0, 5)
-    MinButton.BackgroundColor3 = Color3.fromRGB(75, 75, 80)
+    MinButton.Size =
+        UDim2.new(0, 28, 0, 25)
+
+    MinButton.Position =
+        UDim2.new(1, -64, 0, 5)
+
+    MinButton.BackgroundColor3 =
+        Color3.fromRGB(75, 75, 80)
+
     MinButton.Text = "—"
-    MinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+    MinButton.TextColor3 =
+        Color3.fromRGB(255, 255, 255)
+
     MinButton.TextSize = 18
     MinButton.Font = Enum.Font.SourceSansBold
     MinButton.ZIndex = 10
     MinButton.Parent = MainFrame
 
-    local MinCorner = Instance.new("UICorner")
-    MinCorner.CornerRadius = UDim.new(0, 6)
+    local MinCorner =
+        Instance.new("UICorner")
+
+    MinCorner.CornerRadius =
+        UDim.new(0, 6)
+
     MinCorner.Parent = MinButton
 
-    --=====================================================
-    -- BOTTONE CHIUDI
-    --=====================================================
+    --=========================================================
+    -- CLOSE BUTTON
+    --=========================================================
 
-    local CloseButton = Instance.new("TextButton")
+    local CloseButton =
+        Instance.new("TextButton")
+
     CloseButton.Name = "CloseButton"
-    CloseButton.Size = UDim2.new(0, 28, 0, 25)
-    CloseButton.Position = UDim2.new(1, -32, 0, 5)
-    CloseButton.BackgroundColor3 = Color3.fromRGB(190, 50, 50)
+
+    CloseButton.Size =
+        UDim2.new(0, 28, 0, 25)
+
+    CloseButton.Position =
+        UDim2.new(1, -32, 0, 5)
+
+    CloseButton.BackgroundColor3 =
+        Color3.fromRGB(190, 50, 50)
+
     CloseButton.Text = "×"
-    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+    CloseButton.TextColor3 =
+        Color3.fromRGB(255, 255, 255)
+
     CloseButton.TextSize = 18
     CloseButton.Font = Enum.Font.SourceSansBold
     CloseButton.ZIndex = 10
     CloseButton.Parent = MainFrame
 
-    local CloseCorner = Instance.new("UICorner")
-    CloseCorner.CornerRadius = UDim.new(0, 6)
+    local CloseCorner =
+        Instance.new("UICorner")
+
+    CloseCorner.CornerRadius =
+        UDim.new(0, 6)
+
     CloseCorner.Parent = CloseButton
+
+    --=========================================================
+    -- ELEMENTI DA NASCONDERE
+    --=========================================================
 
     local content = {
         FarmButton,
@@ -539,11 +775,16 @@ local function CreaInterfaccia()
         StatusInfo2
     }
 
+    --=========================================================
+    -- MINIMIZZA / RIPRISTINA
+    --=========================================================
+
     MinButton.MouseButton1Click:Connect(function()
         minimized = not minimized
 
         if minimized then
-            MainFrame.Size = UDim2.new(0, 260, 0, 36)
+            MainFrame.Size =
+                UDim2.new(0, 260, 0, 36)
 
             for i = 1, #content do
                 if content[i] then
@@ -553,7 +794,8 @@ local function CreaInterfaccia()
 
             MinButton.Text = "+"
         else
-            MainFrame.Size = UDim2.new(0, 260, 0, 350)
+            MainFrame.Size =
+                UDim2.new(0, 260, 0, 350)
 
             for i = 1, #content do
                 if content[i] then
@@ -564,6 +806,10 @@ local function CreaInterfaccia()
             MinButton.Text = "—"
         end
     end)
+
+    --=========================================================
+    -- CHIUSURA GUI
+    --=========================================================
 
     CloseButton.MouseButton1Click:Connect(function()
         _G.FarmingAttivo = false
@@ -584,17 +830,23 @@ local function CreaInterfaccia()
 
         ScreenGui:Destroy()
 
-        print("[GUI] Manager Mobs rimosso.")
+        print(
+            "[GUI] Skull Generator rimosso."
+        )
     end)
 
-    print("[GUI] Interfaccia caricata in PlayerGui.")
+    print(
+        "[GUI] Interfaccia caricata in PlayerGui."
+    )
 end
 
 --=========================================================
--- AVVIO STRUTTURALE COMPLESSIVO
+-- AVVIO CORE
 --=========================================================
 
 InizializzaAntiAFK()
 CreaInterfaccia()
 
-print("[SYSTEM] TrixAde Mob & Skull Tracker fully loaded.")
+print(
+    "[SYSTEM] TrixAde Skull Generator fully operational."
+)
