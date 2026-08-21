@@ -58,14 +58,14 @@ local function signedNumber(n)
 end
 
 --===================================================================================
--- COMBAT ENGINE HYPER-BURST + CRIMINAL NPC ONLY BIND FREEZE (PROTEZIONE EFFETTIVA)
--- Aggancia esclusivamente i modelli nemici "Criminal" escludendo al 100% i Player
+-- COMBAT ENGINE HYPER-BURST POWER SPAMMING (BRUTE PUNCH / DUAL KNIVES FIX)
+-- Forza l'invio di 2000 attacchi simulando la mossa equipaggiata sui Criminal
 --===================================================================================
 local skullThreadAttivo = false
 local animHitRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AnimHit")
 local petAttackRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("PetAttack")
 
--- Funzione isolata che scarica la raffica di colpi asincroni sul server
+-- Funzione asincrona che bombarda il server con la mossa attiva
 local function scaricaColpiFlash(target)
     for colpo = 1, 200 do
         if target.Parent == nil or not _G.FarmingAttivo then break end
@@ -73,7 +73,12 @@ local function scaricaColpiFlash(target)
         if hum and hum.Health <= 0 then break end
         
         pcall(function()
-            animHitRemote:FireServer(target)
+            -- Spara l'attacco dell'eroe configurando l'argomento corretto richiesto dal server
+            animHitRemote:FireServer(target, "Attack") 
+            animHitRemote:FireServer(target, "Punch")
+            animHitRemote:FireServer(target, "BrutePunch")
+            
+            -- Spara l'attacco simultaneo dei pet per raddoppiare la frequenza
             petAttackRemote:FireServer(target)
         end)
     end
@@ -87,17 +92,15 @@ local function runUltimateCombo()
     local bersaglioVicino = nil
     local distanzaMinima = math.huge
     
-    -- 1. SCANSIONE SELETTIVA RIGIDA: CERCA NELLA CARTELLA DEI MOBS O NEL WORKSPACE
+    -- Scansione profonda per isolare i Criminal vivi
     local function controllaModello(obj)
         local hum = obj:FindFirstChildOfClass("Humanoid")
-        local mRoot = obj:FindFirstChild("HumanoidRootPart")
+        -- Correzione: Cerca HumanoidRootPart in modo sicuro senza far crashare lo script se è nil
+        local mRoot = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChildWhichIsA("BasePart", true)
         
         if hum and mRoot and hum.Health > 0 and obj.Name ~= lPlayer.Name then
-            -- FILTRO ANTI-BAN DEFINITIVO:
-            -- Colpisce SOLO se il nome del modello contiene "Criminal" o "Droid", ignorando i Player reali
             local nomeLower = obj.Name:lower()
             if nomeLower:match("criminal") or nomeLower:match("droid") or obj.Parent.Name:lower():match("mobs") then
-                -- Assicurati che non sia un giocatore reale controllando se esiste nei servizi Player
                 if not game.Players:GetPlayerFromCharacter(obj) then
                     local distanza = (hrp.Position - mRoot.Position).Magnitude
                     if distanza < distanzaMinima then
@@ -109,7 +112,6 @@ local function runUltimateCombo()
         end
     end
 
-    -- Controlla sia gli oggetti liberi nel Workspace sia quelli dentro la cartella Workspace.Mobs
     local oggettiWorkspace = workspace:GetChildren()
     for i = 1, #oggettiWorkspace do
         controllaModello(oggettiWorkspace[i])
@@ -123,23 +125,23 @@ local function runUltimateCombo()
         end
     end
     
-    -- 2. BLOCCO SPAZIALE DEL MOSTRO CRIMINAL E SCARICA DI DANNO
+    -- Esecuzione blocco e scarica di rete da 2000 colpi
     if bersaglioVicino and _G.FarmingAttivo then
-        local mRoot = bersaglioVicino:FindFirstChild("HumanoidRootPart")
+        local mRoot = bersaglioVicino:FindFirstChild("HumanoidRootPart") or bersaglioVicino:FindFirstChildWhichIsA("BasePart", true)
         if mRoot then
-            -- MODULO BIND-FREEZE: Calamita e immobilizza il mostro a 3 studs davanti a te
             pcall(function()
+                -- Trascina e blocca il Criminal a 3 studs davanti a te
                 mRoot.CFrame = hrp.CFrame * CFrame.new(0, 0, -3)
             end)
             
-            -- Scarica l'Hyper-Burst dei pet e dell'arma sul Criminal congelato
+            -- Sgancia 10 thread asincroni paralleli per generare la raffica massima
             for thread = 1, 10 do
                 task.spawn(scaricaColpiFlash, bersaglioVicino)
             end
         end
     end
     
-    -- 3. MAGNETE AUTOMATICO TESCHI E REWARD
+    -- Calamita automatica dei teschi rilasciati
     local drops = workspace:GetChildren()
     for j = 1, #drops do
         if not _G.FarmingAttivo then break end
@@ -162,15 +164,16 @@ function AvviaLoopFarming()
     skullThreadAttivo = true
 
     task.spawn(function()
-        print("[SAFE CRIMINAL CORE] Blocco selettivo NPC e attacco combinato attivi.")
+        print("[HYPER SPAMMING CORE] Attacco forzato mosse speciali e calamita attivi.")
         while _G.FarmingAttivo do
             pcall(runUltimateCombo)
             task.wait(0.03)
         end
         skullThreadAttivo = false
-        print("[SAFE CRIMINAL CORE] Ciclo terminato.")
+        print("[HYPER SPAMMING CORE] Ciclo terminato.")
     end)
 end
+
 
 --===================================================================================
 -- PROTEZIONE ANTI-AFK
