@@ -58,8 +58,8 @@ local function signedNumber(n)
 end
 
 --===================================================================================
--- COMBAT ENGINE HYPER-BURST: MULTI-THREADING ATTACK (EROE + MULTI-PET)
--- Crea 10 canali paralleli asincroni per scaricare 2000 colpi al secondo sul server
+-- COMBAT ENGINE HYPER-BURST + FREEZE NEMICI (EROE + MULTI-PET)
+-- Blocca i movimenti dei Battle Droid e scarica 2000 colpi al secondo
 --===================================================================================
 local skullThreadAttivo = false
 local animHitRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AnimHit")
@@ -84,7 +84,7 @@ local function runUltimateCombo()
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
-    -- Scansione e isolamento del Battle Droid
+    -- Scansione e blocco dei Battle Droid
     local droids = Workspace:GetChildren()
     for i = 1, #droids do
         if not _G.FarmingAttivo then break end
@@ -94,11 +94,20 @@ local function runUltimateCombo()
         local mRoot = obj:FindFirstChild("HumanoidRootPart")
         
         if hum and mRoot and obj.Name ~= lPlayer.Name and hum.Health > 0 then
-            -- GLITCH MULTI-THREAD: Avvia 10 attacchi in parallelo nello stesso millesimo di secondo
+            
+            -- ==========================================
+            -- MODULO FREEZE: IMMOBILIZZA IL BOT SUL POSTO
+            -- ==========================================
+            pcall(function()
+                hum.WalkSpeed = 0 -- Azzera la velocità di movimento del bot
+                mRoot.Anchored = true -- Blocca fisicamente la coordinata nello spazio client
+            end)
+            
+            -- GLITCH MULTI-THREAD: Avvia 10 attacchi in parallelo sul bot congelato
             for thread = 1, 10 do
                 task.spawn(scaricaColpiFlash, obj)
             end
-            break -- Concentra tutta la potenza devastante su un solo droid alla volta
+            break -- Concentra tutta la potenza sul bot attualmente bloccato
         end
     end
     
@@ -125,17 +134,15 @@ function AvviaLoopFarming()
     skullThreadAttivo = true
 
     task.spawn(function()
-        print("[HYPER CORE] Moltiplicatore di frequenza d'attacco e magnete attivi.")
+        print("[HYPER CORE] Moltiplicatore di frequenza e modulo FREEZE attivi.")
         while _G.FarmingAttivo do
             pcall(runUltimateCombo)
-            -- Pausa fissa minima per dare tempo alla rete di inviare la mega scarica
             task.wait(0.05) 
         end
         skullThreadAttivo = false
         print("[HYPER CORE] Ciclo terminato.")
     end)
 end
-
 
 --===================================================================================
 -- PROTEZIONE ANTI-AFK
