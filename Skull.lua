@@ -58,14 +58,14 @@ local function signedNumber(n)
 end
 
 --===================================================================================
--- COMBAT ENGINE HYPER-BURST + FREEZE NEMICI (EROE + MULTI-PET)
--- Blocca i movimenti dei Battle Droid e scarica 2000 colpi al secondo
+-- COMBAT ENGINE HYPER-BURST + DISTANCE BIND FREEZE (EROE + MULTI-PET)
+-- Blocca il Battle Droid più vicino bloccandolo direttamente davanti alla tua faccia
 --===================================================================================
 local skullThreadAttivo = false
 local animHitRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AnimHit")
 local petAttackRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("PetAttack")
 
--- Funzione isolata che spara una scarica flash sul bersaglio
+-- Funzione isolata che scarica la raffica di colpi asincroni sul server
 local function scaricaColpiFlash(target)
     for colpo = 1, 200 do
         if target.Parent == nil or not _G.FarmingAttivo then break end
@@ -84,34 +84,43 @@ local function runUltimateCombo()
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
-    -- Scansione e blocco dei Battle Droid
+    local bersaglioVicino = nil
+    local distanzaMinima = math.huge -- Inizia con un valore infinito per calcolare la distanza reale
+    
+    -- 1. SCANSIONE E CALCOLO DISTANZA PER IDENTIFICARE IL BOT PIÙ VICINO
     local droids = Workspace:GetChildren()
     for i = 1, #droids do
-        if not _G.FarmingAttivo then break end
         local obj = droids[i]
-        
         local hum = obj:FindFirstChildOfClass("Humanoid")
         local mRoot = obj:FindFirstChild("HumanoidRootPart")
         
         if hum and mRoot and obj.Name ~= lPlayer.Name and hum.Health > 0 then
-            
-            -- ==========================================
-            -- MODULO FREEZE: IMMOBILIZZA IL BOT SUL POSTO
-            -- ==========================================
-            pcall(function()
-                hum.WalkSpeed = 0 -- Azzera la velocità di movimento del bot
-                mRoot.Anchored = true -- Blocca fisicamente la coordinata nello spazio client
-            end)
-            
-            -- GLITCH MULTI-THREAD: Avvia 10 attacchi in parallelo sul bot congelato
-            for thread = 1, 10 do
-                task.spawn(scaricaColpiFlash, obj)
+            -- Calcola quanti studs di distanza ci sono tra te e questo bot
+            local distanza = (hrp.Position - mRoot.Position).Magnitude
+            if distanza < distanzaMinima then
+                distanzaMinima = distanza
+                bersaglioVicino = obj
             end
-            break -- Concentra tutta la potenza sul bot attualmente bloccato
         end
     end
     
-    -- MAGNETE ULTRASONICO: Calamita i teschi lasciati a terra
+    -- 2. BLOCCO SPAZIALE DEL BERSAGLIO E SCARICA DI DANNO
+    if bersaglioVicino and _G.FarmingAttivo then
+        local mRoot = bersaglioVicino:FindFirstChild("HumanoidRootPart")
+        if mRoot then
+            -- MODULO BIND-FREEZE: Costringe il bot a fluttuare immobile a 3 studs davanti a te
+            pcall(function()
+                mRoot.CFrame = hrp.CFrame * CFrame.new(0, 0, -3)
+            end)
+            
+            -- Avvia l'Hyper-Burst asincrono sul bersaglio bloccato
+            for thread = 1, 10 do
+                task.spawn(scaricaColpiFlash, bersaglioVicino)
+            end
+        end
+    end
+    
+    -- 3. MAGNETE AUTOMATICO TESCHI E REWARD
     local drops = Workspace:GetChildren()
     for j = 1, #drops do
         if not _G.FarmingAttivo then break end
@@ -134,13 +143,13 @@ function AvviaLoopFarming()
     skullThreadAttivo = true
 
     task.spawn(function()
-        print("[HYPER CORE] Moltiplicatore di frequenza e modulo FREEZE attivi.")
+        print("[HYPER BIND CORE] Modulo Bind-Freeze e attacco asincrono attivi.")
         while _G.FarmingAttivo do
             pcall(runUltimateCombo)
-            task.wait(0.05) 
+            task.wait(0.03) -- Calibrato per rinfrescare la posizione del bot in tempo reale
         end
         skullThreadAttivo = false
-        print("[HYPER CORE] Ciclo terminato.")
+        print("[HYPER BIND CORE] Ciclo terminato.")
     end)
 end
 
