@@ -14,95 +14,80 @@ local pGui = lPlayer:WaitForChild("PlayerGui")
 
 _G.KillETeschiAttivo = false
 
---=========================================================
--- LOGICA COMBINATA: AUTO ATTACK + CALCOLO MAGNETE TESCHI
---=========================================================
+--===================================================================================
+-- COMBAT ENGINE ULTRA-RAFFICA: GLITCH ATTACCO COMPRESSO (EROE + MULTI-PET)
+-- Spara 150 colpi simultanei al secondo per frantumare i 100 Trilioni di vita
+--===================================================================================
+local skullThreadAttivo = false
+local animHitRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AnimHit")
+local petAttackRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("PetAttack")
 
-local function AvviaLoopMob()
-    task.spawn(function()
-        print("[MONSTER CORE] Loop d'attacco e magnete avviato.")
-
-        while _G.KillETeschiAttivo do
-            local char = lPlayer.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local tool = char and char:FindFirstChildOfClass("Tool")
-            local weaponPart = tool and (
-                tool:FindFirstChild("Handle")
-                or tool:FindFirstChildWhichIsA("BasePart", true)
-            )
-
-            -- Sfrutta il corpo se l'arma non è in mano
-            local attackSource = weaponPart or hrp
-
-            if hrp and attackSource then
-                -- 1. ATTACCO INVISIBILE A DISTANZA (KILL AURA)
-                for _, obj in ipairs(Workspace:GetChildren()) do
-                    if not _G.KillETeschiAttivo then
-                        break
-                    end
-
-                    local hum = obj:FindFirstChildOfClass("Humanoid")
-                    local mRoot = obj:FindFirstChild("HumanoidRootPart")
-
-                    -- Attacca solo i mostri vivi e salta il tuo personaggio
-                    if hum
-                        and mRoot
-                        and obj.Name ~= lPlayer.Name
-                        and hum.Health > 0
-                    then
-                        -- Genera una raffica controllata di 10 colpi simultanei
-                        for colpo = 1, 10 do
-                            if hum.Health <= 0 or not _G.KillETeschiAttivo then
-                                break
-                            end
-
-                            pcall(function()
-                                firetouchinterest(mRoot, attackSource, 0)
-                                firetouchinterest(mRoot, attackSource, 1)
-                            end)
-                        end
-                    end
-                end
-
-                -- 2. CALCOLO E MAGNETE CALAMITA TESCHI (DROP)
-                for _, obj in ipairs(Workspace:GetChildren()) do
-                    if not _G.KillETeschiAttivo then
-                        break
-                    end
-
-                    if obj:IsA("Model")
-                        or obj:IsA("BasePart")
-                        or obj:IsA("MeshPart")
-                    then
-                        local nameLower = obj.Name:lower()
-
-                        if nameLower:match("drop")
-                            or nameLower:match("skull")
-                            or nameLower:match("teschio")
-                            or nameLower:match("reward")
-                        then
-                            local part = obj:IsA("BasePart")
-                                    and obj
-                                or obj:FindFirstChildWhichIsA(
-                                    "BasePart",
-                                    true
-                                )
-
-                            if part then
-                                part.CFrame = hrp.CFrame
-                            end
-                        end
-                    end
+local function runUltimateCombo()
+    local char = lPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    -- Scansione e targeting immediato sul Battle Droid dell'ultima zona
+    local droids = workspace:GetChildren()
+    for i = 1, #droids do
+        if not _G.FarmingAttivo then break end
+        local obj = droids[i]
+        
+        local hum = obj:FindFirstChildOfClass("Humanoid")
+        local mRoot = obj:FindFirstChild("HumanoidRootPart")
+        
+        -- Individua se il mostro è vivo sul server
+        if hum and mRoot and obj.Name ~= lPlayer.Name and hum.Health > 0 then
+            
+            -- BOMBARDO DI RETE COMPRESSO: 150 colpi simultanei per frame
+            -- Questo simula un danno moltiplicato bypassando il cooldown reale
+            for colpo = 1, 150 do
+                if hum.Health <= 0 or not _G.FarmingAttivo then break end
+                
+                pcall(function()
+                    -- Attacco istantaneo dell'eroe
+                    animHitRemote:FireServer(obj)
+                    -- Attacco simultaneo a vuoto di tutti i pet equipaggiati insieme
+                    petAttackRemote:FireServer(obj)
+                end)
+            end
+        end
+    end
+    
+    -- MAGNETE: Calamita istantaneamente tutti i teschi generati sul tuo corpo
+    local drops = workspace:GetChildren()
+    for j = 1, #drops do
+        if not _G.FarmingAttivo then break end
+        local obj = drops[j]
+        
+        if obj:IsA("Model") or obj:IsA("BasePart") or obj:IsA("MeshPart") then
+            local nameLower = obj.Name:lower()
+            if nameLower:match("drop") or nameLower:match("skull") or nameLower:match("teschio") or nameLower:match("reward") then
+                local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart", true)
+                if part then
+                    part.CFrame = hrp.CFrame
                 end
             end
-
-            -- Pausa anti-lag
-            task.wait(0.05)
         end
+    end
+end
 
-        print("[MONSTER CORE] Loop d'attacco e magnete terminato.")
+function AvviaLoopFarming()
+    if skullThreadAttivo then return end
+    skullThreadAttivo = true
+
+    task.spawn(function()
+        print("[ULTRA CORE] Distruttore di mob e magnete teschi avviati.")
+        while _G.FarmingAttivo do
+            pcall(runUltimateCombo)
+            -- Micro-pausa minima obbligatoria su Delta Mobile per non far frizzare il telefono
+            task.wait(0.01) 
+        end
+        skullThreadAttivo = false
+        print("[ULTRA CORE] Ciclo terminato.")
     end)
 end
+
 
 --=========================================================
 -- ANTI-AFK
