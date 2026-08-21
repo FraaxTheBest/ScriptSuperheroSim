@@ -58,88 +58,60 @@ local function signedNumber(n)
 end
 
 --===================================================================================
--- COMBAT ENGINE ULTRA-RAFFICA
--- GLITCH ATTACCO COMPRESSO (EROE + MULTI-PET)
+-- COMBAT ENGINE HYPER-BURST: MULTI-THREADING ATTACK (EROE + MULTI-PET)
+-- Crea 10 canali paralleli asincroni per scaricare 2000 colpi al secondo sul server
 --===================================================================================
-
 local skullThreadAttivo = false
+local animHitRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AnimHit")
+local petAttackRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("PetAttack")
 
-local animHitRemote = ReplicatedStorage
-    :WaitForChild("Remotes")
-    :WaitForChild("AnimHit")
-
-local petAttackRemote = ReplicatedStorage
-    :WaitForChild("Remotes")
-    :WaitForChild("PetAttack")
+-- Funzione isolata che spara una scarica flash sul bersaglio
+local function scaricaColpiFlash(target)
+    for colpo = 1, 200 do
+        if target.Parent == nil or not _G.FarmingAttivo then break end
+        local hum = target:FindFirstChildOfClass("Humanoid")
+        if hum and hum.Health <= 0 then break end
+        
+        pcall(function()
+            animHitRemote:FireServer(target)
+            petAttackRemote:FireServer(target)
+        end)
+    end
+end
 
 local function runUltimateCombo()
     local char = lPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
-
-    if not hrp then
-        return
-    end
-
-    -- Scansione rapida della stanza per colpire i Battle Droid
+    if not hrp then return end
+    
+    -- Scansione e isolamento del Battle Droid
     local droids = Workspace:GetChildren()
-
     for i = 1, #droids do
-        if not _G.FarmingAttivo then
-            break
-        end
-
+        if not _G.FarmingAttivo then break end
         local obj = droids[i]
+        
         local hum = obj:FindFirstChildOfClass("Humanoid")
         local mRoot = obj:FindFirstChild("HumanoidRootPart")
-
-        if hum
-            and mRoot
-            and obj.Name ~= lPlayer.Name
-            and hum.Health > 0
-        then
-            -- 150 colpi simultanei per frame comprimendo la rete
-            for colpo = 1, 150 do
-                if hum.Health <= 0 or not _G.FarmingAttivo then
-                    break
-                end
-
-                pcall(function()
-                    animHitRemote:FireServer(obj)
-                    petAttackRemote:FireServer(obj)
-                end)
+        
+        if hum and mRoot and obj.Name ~= lPlayer.Name and hum.Health > 0 then
+            -- GLITCH MULTI-THREAD: Avvia 10 attacchi in parallelo nello stesso millesimo di secondo
+            for thread = 1, 10 do
+                task.spawn(scaricaColpiFlash, obj)
             end
+            break -- Concentra tutta la potenza devastante su un solo droid alla volta
         end
     end
-
-    -- MAGNETE: calamita tutti i teschi generati sul tuo corpo
+    
+    -- MAGNETE ULTRASONICO: Calamita i teschi lasciati a terra
     local drops = Workspace:GetChildren()
-
     for j = 1, #drops do
-        if not _G.FarmingAttivo then
-            break
-        end
-
+        if not _G.FarmingAttivo then break end
         local obj = drops[j]
-
-        if obj:IsA("Model")
-            or obj:IsA("BasePart")
-            or obj:IsA("MeshPart")
-        then
+        
+        if obj:IsA("Model") or obj:IsA("BasePart") or obj:IsA("MeshPart") then
             local nameLower = obj.Name:lower()
-
-            if nameLower:match("drop")
-                or nameLower:match("skull")
-                or nameLower:match("teschio")
-                or nameLower:match("reward")
-            then
-                local part
-
-                if obj:IsA("BasePart") then
-                    part = obj
-                else
-                    part = obj:FindFirstChildWhichIsA("BasePart", true)
-                end
-
+            if nameLower:match("drop") or nameLower:match("skull") or nameLower:match("teschio") or nameLower:match("reward") then
+                local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart", true)
                 if part then
                     part.CFrame = hrp.CFrame
                 end
@@ -149,25 +121,21 @@ local function runUltimateCombo()
 end
 
 function AvviaLoopFarming()
-    if skullThreadAttivo then
-        return
-    end
-
+    if skullThreadAttivo then return end
     skullThreadAttivo = true
 
     task.spawn(function()
-        print("[ULTRA CORE] Distruttore di mob e magnete teschi avviati.")
-
+        print("[HYPER CORE] Moltiplicatore di frequenza d'attacco e magnete attivi.")
         while _G.FarmingAttivo do
             pcall(runUltimateCombo)
-            task.wait(0.01)
+            -- Pausa fissa minima per dare tempo alla rete di inviare la mega scarica
+            task.wait(0.05) 
         end
-
         skullThreadAttivo = false
-
-        print("[ULTRA CORE] Ciclo terminato.")
+        print("[HYPER CORE] Ciclo terminato.")
     end)
 end
+
 
 --===================================================================================
 -- PROTEZIONE ANTI-AFK
