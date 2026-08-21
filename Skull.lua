@@ -438,47 +438,8 @@ local function CreaInterfaccia()
     end)
 
     --=====================================================
-    -- BOTTONE MINIMIZZA
+    -- GESTIONE INTERATTIVA MINIMIZZA ED ESPANDI (— / +)
     --=====================================================
-
-    local minimized = false
-
-    local MinButton = Instance.new("TextButton")
-    MinButton.Name = "MinButton"
-    MinButton.Size = UDim2.new(0, 28, 0, 25)
-    MinButton.Position = UDim2.new(1, -64, 0, 5)
-    MinButton.BackgroundColor3 = Color3.fromRGB(75, 75, 80)
-    MinButton.Text = "—"
-    MinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    MinButton.TextSize = 18
-    MinButton.Font = Enum.Font.SourceSansBold
-    MinButton.ZIndex = 10
-    MinButton.Parent = MainFrame
-
-    local MinCorner = Instance.new("UICorner")
-    MinCorner.CornerRadius = UDim.new(0, 6)
-    MinCorner.Parent = MinButton
-
-    --=====================================================
-    -- BOTTONE CHIUDI
-    --=====================================================
-
-    local CloseButton = Instance.new("TextButton")
-    CloseButton.Name = "CloseButton"
-    CloseButton.Size = UDim2.new(0, 28, 0, 25)
-    CloseButton.Position = UDim2.new(1, -32, 0, 5)
-    CloseButton.BackgroundColor3 = Color3.fromRGB(190, 50, 50)
-    CloseButton.Text = "×"
-    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CloseButton.TextSize = 18
-    CloseButton.Font = Enum.Font.SourceSansBold
-    CloseButton.ZIndex = 10
-    CloseButton.Parent = MainFrame
-
-    local CloseCorner = Instance.new("UICorner")
-    CloseCorner.CornerRadius = UDim.new(0, 6)
-    CloseCorner.Parent = CloseButton
-
     local content = {
         FarmButton,
         AfkButton,
@@ -498,7 +459,6 @@ local function CreaInterfaccia()
 
             for i = 1, #content do
                 local object = content[i]
-
                 if object then
                     object.Visible = false
                 end
@@ -510,7 +470,6 @@ local function CreaInterfaccia()
 
             for i = 1, #content do
                 local object = content[i]
-
                 if object then
                     object.Visible = true
                 end
@@ -520,32 +479,32 @@ local function CreaInterfaccia()
         end
     end)
 
-    -- Chiusura e pulizia
+    --=====================================================
+    -- CHIUSURA SICURA E SGANCIO MEMORIA EVENTI (×)
+    --=====================================================
     CloseButton.MouseButton1Click:Connect(function()
-        _G.KillETeschiAttivo = false
+        _G.FarmingAttivo = false -- Arresta istantaneamente il loop da 150 colpi
         trackerRunning = false
         dragging = false
 
-        if dragConnection then
-            dragConnection:Disconnect()
-        end
-
-        if idleConnection then
-            idleConnection:Disconnect()
-        end
+        -- Protezione pcall contro i crash da variabili non definite
+        pcall(function()
+            if dragConnection then dragConnection:Disconnect() end
+        end)
+        pcall(function()
+            if idleConnection then idleConnection:Disconnect() end
+        end)
 
         ScreenGui:Destroy()
-
-        print("[GUI] Manager Mobs rimosso.")
+        print("[GUI] Manager Mobs rimosso correttamente.")
     end)
 
     print("[GUI] Interfaccia caricata in PlayerGui.")
 end
 
 --=========================================================
--- AVVIO GLOBALE
+-- AVVIO GLOBALE DELL'INTERO CORE
 --=========================================================
-
 InizializzaAntiAFK()
 CreaInterfaccia()
 
