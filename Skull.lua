@@ -58,8 +58,8 @@ local function signedNumber(n)
 end
 
 --===================================================================================
--- COMBAT ENGINE HYPER-BURST + DISTANCE BIND FREEZE (EROE + MULTI-PET)
--- Blocca il Battle Droid più vicino bloccandolo direttamente davanti alla tua faccia
+-- COMBAT ENGINE HYPER-BURST + CRIMINAL NPC ONLY BIND FREEZE (PROTEZIONE EFFETTIVA)
+-- Aggancia esclusivamente i modelli nemici "Criminal" escludendo al 100% i Player
 --===================================================================================
 local skullThreadAttivo = false
 local animHitRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AnimHit")
@@ -85,35 +85,54 @@ local function runUltimateCombo()
     if not hrp then return end
     
     local bersaglioVicino = nil
-    local distanzaMinima = math.huge -- Inizia con un valore infinito per calcolare la distanza reale
+    local distanzaMinima = math.huge
     
-    -- 1. SCANSIONE E CALCOLO DISTANZA PER IDENTIFICARE IL BOT PIÙ VICINO
-    local droids = Workspace:GetChildren()
-    for i = 1, #droids do
-        local obj = droids[i]
+    -- 1. SCANSIONE SELETTIVA RIGIDA: CERCA NELLA CARTELLA DEI MOBS O NEL WORKSPACE
+    local function controllaModello(obj)
         local hum = obj:FindFirstChildOfClass("Humanoid")
         local mRoot = obj:FindFirstChild("HumanoidRootPart")
         
-        if hum and mRoot and obj.Name ~= lPlayer.Name and hum.Health > 0 then
-            -- Calcola quanti studs di distanza ci sono tra te e questo bot
-            local distanza = (hrp.Position - mRoot.Position).Magnitude
-            if distanza < distanzaMinima then
-                distanzaMinima = distanza
-                bersaglioVicino = obj
+        if hum and mRoot and hum.Health > 0 and obj.Name ~= lPlayer.Name then
+            -- FILTRO ANTI-BAN DEFINITIVO:
+            -- Colpisce SOLO se il nome del modello contiene "Criminal" o "Droid", ignorando i Player reali
+            local nomeLower = obj.Name:lower()
+            if nomeLower:match("criminal") or nomeLower:match("droid") or obj.Parent.Name:lower():match("mobs") then
+                -- Assicurati che non sia un giocatore reale controllando se esiste nei servizi Player
+                if not game.Players:GetPlayerFromCharacter(obj) then
+                    local distanza = (hrp.Position - mRoot.Position).Magnitude
+                    if distanza < distanzaMinima then
+                        distanzaMinima = distanza
+                        bersaglioVicino = obj
+                    end
+                end
             end
         end
     end
+
+    -- Controlla sia gli oggetti liberi nel Workspace sia quelli dentro la cartella Workspace.Mobs
+    local oggettiWorkspace = workspace:GetChildren()
+    for i = 1, #oggettiWorkspace do
+        controllaModello(oggettiWorkspace[i])
+    end
     
-    -- 2. BLOCCO SPAZIALE DEL BERSAGLIO E SCARICA DI DANNO
+    local cartellaMobs = workspace:FindFirstChild("Mobs")
+    if cartellaMobs then
+        local oggettiMobs = cartellaMobs:GetChildren()
+        for i = 1, #oggettiMobs do
+            controllaModello(oggettiMobs[i])
+        end
+    end
+    
+    -- 2. BLOCCO SPAZIALE DEL MOSTRO CRIMINAL E SCARICA DI DANNO
     if bersaglioVicino and _G.FarmingAttivo then
         local mRoot = bersaglioVicino:FindFirstChild("HumanoidRootPart")
         if mRoot then
-            -- MODULO BIND-FREEZE: Costringe il bot a fluttuare immobile a 3 studs davanti a te
+            -- MODULO BIND-FREEZE: Calamita e immobilizza il mostro a 3 studs davanti a te
             pcall(function()
                 mRoot.CFrame = hrp.CFrame * CFrame.new(0, 0, -3)
             end)
             
-            -- Avvia l'Hyper-Burst asincrono sul bersaglio bloccato
+            -- Scarica l'Hyper-Burst dei pet e dell'arma sul Criminal congelato
             for thread = 1, 10 do
                 task.spawn(scaricaColpiFlash, bersaglioVicino)
             end
@@ -121,7 +140,7 @@ local function runUltimateCombo()
     end
     
     -- 3. MAGNETE AUTOMATICO TESCHI E REWARD
-    local drops = Workspace:GetChildren()
+    local drops = workspace:GetChildren()
     for j = 1, #drops do
         if not _G.FarmingAttivo then break end
         local obj = drops[j]
@@ -143,13 +162,13 @@ function AvviaLoopFarming()
     skullThreadAttivo = true
 
     task.spawn(function()
-        print("[HYPER BIND CORE] Modulo Bind-Freeze e attacco asincrono attivi.")
+        print("[SAFE CRIMINAL CORE] Blocco selettivo NPC e attacco combinato attivi.")
         while _G.FarmingAttivo do
             pcall(runUltimateCombo)
-            task.wait(0.03) -- Calibrato per rinfrescare la posizione del bot in tempo reale
+            task.wait(0.03)
         end
         skullThreadAttivo = false
-        print("[HYPER BIND CORE] Ciclo terminato.")
+        print("[SAFE CRIMINAL CORE] Ciclo terminato.")
     end)
 end
 
