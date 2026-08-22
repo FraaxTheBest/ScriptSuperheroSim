@@ -1,6 +1,6 @@
 --===================================================================================
--- TRIXADE MUSCLE LEGENDS - AUTOMATIC INDUSTRIAL CRYSTAL ENGINE
--- AUTO-OPEN + AUTO-SELL FILTER (KEEPS APEX OVERLORD ONLY)
+-- TRIXADE MUSCLE LEGENDS - AUTOMATIC INDUSTRIAL CRYSTAL ENGINE (FIXED V2)
+-- CON SPOSTAMENTO FISICO INTEGRATO E ACCUMULO GEMME TRACKER
 --===================================================================================
 
 local Players = game:GetService("Players")
@@ -14,24 +14,51 @@ local openCrystalRemote = ReplicatedStorage:WaitForChild("rEvents"):WaitForChild
 local sellPetEvent = ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("sellPetEvent")
 
 _G.AutoEggAttivo = false
-local CRYSTAL_NAME = "Industrial Crystal"
 local PET_DA_SALVARE = "Apex Overlord"
 
 --===================================================================================
--- ENGINE APERTURA E FILTRO VENDITA SELETTIVA
+-- TRACCIAMENTO POSIZIONE CRISTALLO
+--===================================================================================
+local function trovaPosizioneCristallo()
+    local cFolder = workspace:FindFirstChild("Crystals") or workspace:FindFirstChild("mapCrystalsFolder")
+    if cFolder then
+        for _, crystal in ipairs(cFolder:GetChildren()) do
+            if crystal.Name:lower():match("industrial") then
+                -- Restituisce la parte solida principale del cristallo tridimensionale
+                return crystal:FindFirstChildWhichIsA("BasePart") or crystal
+            end
+        end
+    end
+    return nil
+end
+
+--===================================================================================
+-- ENGINE DI APERTURA MULTI-STRINGA CON FILTRO VENDITA AUTOMATICA
 --===================================================================================
 local eggThreadAttivo = false
 
 local function eseguiAutoEgg()
     task.spawn(function()
-        print("[EGG CORE] Ciclo di apertura Industrial Crystal avviato.")
+        print("[EGG SYSTEM] Loop di sblocco gemme avviato.")
         while _G.AutoEggAttivo do
-            -- 1. TENTA L'ACQUISTO DELL'UOVO VIA REMOTEFUNCTION
-            local successo, risultato = pcall(function()
-                return openCrystalRemote:InvokeServer(CRYSTAL_NAME)
+            local char = lPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local crystalPart = trovaPosizioneCristallo()
+            
+            -- Sincronizza la distanza se il cristallo è presente nella mappa
+            if hrp and crystalPart then
+                pcall(function()
+                    hrp.CFrame = crystalPart.CFrame * CFrame.new(0, 4, 0)
+                end)
+            end
+            
+            -- Tenta l'acquisto provando le varianti di stringa per forzare il server
+            pcall(function()
+                openCrystalRemote:InvokeServer("Industrial Crystal")
+                openCrystalRemote:InvokeServer("Industrial")
             end)
             
-            -- 2. SCANSIONE IMMEDIATA DELLO ZAINO PER IL FILTRO VENDITA
+            -- SCANSIONE E SVUOTAMENTO IMMEDIATO ZAINO PET
             local folderPet = lPlayer:FindFirstChild("Pets") or lPlayer:FindFirstChild("PetFolder")
             if folderPet then
                 local listaPet = folderPet:GetChildren()
@@ -39,22 +66,21 @@ local function eseguiAutoEgg()
                     if not _G.AutoEggAttivo then break end
                     local pet = listaPet[i]
                     
-                    -- Se il nome NON corrisponde all'Apex Overlord, lo vende istantaneamente
                     if pet.Name ~= PET_DA_SALVARE then
                         pcall(function()
                             sellPetEvent:FireServer(pet)
                         end)
                     else
-                        print("[MEGA DROP!] Apex Overlord trovato e salvato con successo dal filtro!")
+                        print("[ALERT!] Apex Overlord intercettato e protetto nel backpack!")
                     end
                 end
             end
             
-            -- Pausa fissa calibrata per non far frizzare l'applicazione Delta su Mobile
-            task.wait(0.3)
+            -- Cooldown di 0.4 secondi per consentire a Delta di elaborare le gemme residue
+            task.wait(0.4)
         end
         eggThreadAttivo = false
-        print("[EGG CORE] Ciclo terminato.")
+        print("[EGG SYSTEM] Loop interrotto.")
     end)
 end
 
@@ -65,22 +91,7 @@ function AvviaAutoEgg()
 end
 
 --===================================================================================
--- PROTEZIONE BASE ANTI-AFK
---===================================================================================
-local idleConnection = nil
-local function InizializzaAntiAFK()
-    pcall(function()
-        local virtualUser = game:GetService("VirtualUser")
-        idleConnection = lPlayer.Idled:Connect(function()
-            if not _G.AutoEggAttivo then return end
-            virtualUser:CaptureController()
-            virtualUser:ClickButton2(Vector2.new(0, 0))
-        end)
-    end)
-end
-
---===================================================================================
--- CREAZIONE INTERFACCIA GRAFICA COMPATTA (STESSO STILE ICONICO)
+-- INTERFACCIA GRAFICA COMPATTA (TRIXADE LOOK)
 --===================================================================================
 local function CreaInterfaccia()
     local screenName = "MuscleLegends_Egg_Gui"
@@ -92,7 +103,6 @@ local function CreaInterfaccia()
     ScreenGui.ResetOnSpawn = false
     ScreenGui.Parent = pGui
 
-    -- Frame Piccolo Leggero anti-freeze (160 di altezza)
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.Size = UDim2.new(0, 240, 0, 160)
@@ -102,9 +112,27 @@ local function CreaInterfaccia()
     MainFrame.Active = true
     MainFrame.Parent = ScreenGui
 
-    -- Sistema di drag nativo Mobile Delta
+    local FrameCorner = Instance.new("UICorner")
+    FrameCorner.CornerRadius = UDim.new(0, 10)
+    FrameCorner.Parent = MainFrame
+
+    local Title = Instance.new("TextLabel")
+    Title.Name = "Title"
+    Title.Size = UDim2.new(1, 0, 0, 35)
+    Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    Title.Text = "TRIXADE CRISTALLO FIX"
+    Title.TextColor3 = Color3.fromRGB(255, 215, 0)
+    Title.TextSize = 13
+    Title.Font = Enum.Font.SourceSansBold
+    Title.Parent = MainFrame
+
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 10)
+    TitleCorner.Parent = Title
+
+    -- Drag Touch Mobile Delta
     local dragging, dragInput, dragStart, startPos
-    MainFrame.InputBegan:Connect(function(input)
+    Title.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
@@ -114,7 +142,7 @@ local function CreaInterfaccia()
             end)
         end
     end)
-    MainFrame.InputChanged:Connect(function(input)
+    Title.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
             dragInput = input
         end
@@ -126,26 +154,6 @@ local function CreaInterfaccia()
         end
     end)
 
-    local FrameCorner = Instance.new("UICorner")
-    FrameCorner.CornerRadius = UDim.new(0, 10)
-    FrameCorner.Parent = MainFrame
-
-    -- Titolo GUI
-    local Title = Instance.new("TextLabel")
-    Title.Name = "Title"
-    Title.Size = UDim2.new(1, 0, 0, 35)
-    Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-    Title.Text = "TRIXADE EGG MANAGER"
-    Title.TextColor3 = Color3.fromRGB(255, 215, 0)
-    Title.TextSize = 13
-    Title.Font = Enum.Font.SourceSansBold
-    Title.Parent = MainFrame
-
-    local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 10)
-    TitleCorner.Parent = Title
-
-    -- Pulsante START / STOP
     local FarmButton = Instance.new("TextButton")
     FarmButton.Name = "FarmButton"
     FarmButton.Size = UDim2.new(0, 200, 0, 40)
@@ -161,13 +169,12 @@ local function CreaInterfaccia()
     ButtonCorner.CornerRadius = UDim.new(0, 8)
     ButtonCorner.Parent = FarmButton
 
-    -- Info Filtro
     local InfoStatus = Instance.new("TextLabel")
     InfoStatus.Name = "InfoStatus"
     InfoStatus.Size = UDim2.new(0, 200, 0, 30)
     InfoStatus.Position = UDim2.new(0.5, -100, 0, 105)
     InfoStatus.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    InfoStatus.Text = "💎 AUTO-SELL ATTIVO (KEEP 1%)"
+    InfoStatus.Text = "🔍 VERIFICA ACQUISTO IN CORSO..."
     InfoStatus.TextColor3 = Color3.fromRGB(100, 255, 255)
     InfoStatus.TextSize = 11
     InfoStatus.Font = Enum.Font.SourceSansBold
@@ -181,18 +188,29 @@ local function CreaInterfaccia()
         _G.AutoEggAttivo = not _G.AutoEggAttivo
         if _G.AutoEggAttivo then
             FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-            FarmButton.Text = "AUTO EGG: ATTIVO 🥚⚡"
+            FarmButton.Text = "OPENING ACTIVE..."
+            InfoStatus.Text = "🔋 DISTANZA E RETE APPOSTO"
             AvviaAutoEgg()
         else
             FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
             FarmButton.Text = "AUTO EGG: DISATTIVATO"
+            InfoStatus.Text = "🔍 VERIFICA ACQUISTO IN CORSO..."
         end
     end)
 end
 
 --===================================================================================
--- ESECUZIONE
+-- AVVIO STRUTTURALE
 --===================================================================================
-InizializzaAntiAFK()
+pcall(function()
+    local virtualUser = game:GetService("VirtualUser")
+    lPlayer.Idled:Connect(function()
+        if _G.AutoEggAttivo then
+            virtualUser:CaptureController()
+            virtualUser:ClickButton2(Vector2.new(0, 0))
+        end
+    end)
+end)
+
 CreaInterfaccia()
-print("[SYSTEM] Muscle Legends Egg Module loaded successfully.")
+print("[SYSTEM] Aggiornamento V2 caricato.")
