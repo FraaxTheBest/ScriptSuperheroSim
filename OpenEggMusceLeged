@@ -1,5 +1,5 @@
 --===================================================================================
--- TRIXADE MUSCLE LEGENDS - TALKING EGG CORE (FIXED LOGS)
+-- TRIXADE MUSCLE LEGENDS - ULTIMATE TALKING EGG CORE (UNIVERSAL PATH FIX)
 -- LOG VERBALIZZATI DOPO APERTURA + AUTO-SELL FILTER + MINIMIZZA/CHIUDI
 --===================================================================================
 
@@ -10,88 +10,169 @@ local UserInputService = game:GetService("UserInputService")
 local lPlayer = Players.LocalPlayer
 local pGui = lPlayer:WaitForChild("PlayerGui")
 
-local openCrystalRemote = ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("openCrystalRemote")
-local sellPetEvent = ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("sellPetEvent")
+local openCrystalRemote = ReplicatedStorage
+    :WaitForChild("rEvents")
+    :WaitForChild("openCrystalRemote")
+
+local sellPetEvent = ReplicatedStorage
+    :WaitForChild("rEvents")
+    :WaitForChild("sellPetEvent")
 
 _G.AutoEggAttivo = false
+
 local CRYSTAL_NAME = "Industrial Crystal"
 local PET_DA_SALVARE = "Apex Overlord"
 
 --===================================================================================
--- ENGINE DI APERTURA E TRACCIAMENTO LOG DOPO ACQUISTO
+-- INTERCETTATORE UNIVERSALE CARTELLA PET E VENDITA FLAMING
 --===================================================================================
+
 local eggThreadAttivo = false
+
+local function trovaCartellaPetReale()
+    -- Prova 1: Percorso leaderstats classico
+    if lPlayer:FindFirstChild("leaderstats")
+        and lPlayer.leaderstats:FindFirstChild("Pets")
+    then
+        return lPlayer.leaderstats.Pets
+    end
+
+    -- Prova 2: Percorso diretto LocalPlayer
+    if lPlayer:FindFirstChild("Pets") then
+        return lPlayer.Pets
+    end
+
+    if lPlayer:FindFirstChild("PetFolder") then
+        return lPlayer.PetFolder
+    end
+
+    -- Prova 3: Percorso Workspace
+    local workspacePets =
+        workspace:FindFirstChild("Pets")
+        or workspace:FindFirstChild("PlayerPets")
+
+    if workspacePets then
+        local userFolder =
+            workspacePets:FindFirstChild(lPlayer.Name)
+            or workspacePets:FindFirstChild(tostring(lPlayer.UserId))
+
+        if userFolder then
+            return userFolder
+        end
+    end
+
+    -- Prova 4: DataFolder interna
+    local dataFolder =
+        lPlayer:FindFirstChild("DataFolder")
+        or lPlayer:FindFirstChild("Data")
+
+    if dataFolder and dataFolder:FindFirstChild("Pets") then
+        return dataFolder.Pets
+    end
+
+    return nil
+end
 
 local function eseguiAutoEgg()
     task.spawn(function()
-        print("[EGG CORE] Loop avviato. In attesa di aperture...")
+        print("[EGG CORE] Loop di vendita istantanea forzato avviato.")
+
         while _G.AutoEggAttivo do
-            
-            -- 1. ESEGUE L'ACQUISTO
+            -- 1. INVIO COMANDO DI APERTURA AL SERVER
             local successo, risultato = pcall(function()
                 return openCrystalRemote:InvokeServer(CRYSTAL_NAME)
             end)
-            
+
             if successo then
-                print("[SERVER INPUT] Richiesta uovo inviata con successo. Attendo caricamento Pet...")
-                task.wait(0.2) -- Pausa obbligatoria per far comparire il pet nello zaino del server
-            else
-                print("[SERVER ERROR] Il server ha rifiutato l'acquisto dell'uovo.")
+                print(
+                    "[SERVER INPUT] Uovo aperto. Sincronizzo filtri zaino..."
+                )
+
+                task.wait(0.2)
             end
-            
-            -- 2. SCANSIONE RIGIDA E SCRITTURA NEI LOG DI OGNI AZIONE
-            local leaderstats = lPlayer:FindFirstChild("leaderstats")
-            local folderPet = leaderstats and leaderstats:FindFirstChild("Pets") or lPlayer:FindFirstChild("Pets")
-            
+
+            -- 2. SCANSIONE CON FILTRO DI PROTEZIONE APEX OVERLORD
+            local folderPet = trovaCartellaPetReale()
+
             if folderPet then
                 local listaPet = folderPet:GetChildren()
-                if #listaPet == 0 then
-                    print("[INFO LOG] Zaino Pet attualmente vuoto o in aggiornamento.")
-                end
-                
+
                 for i = 1, #listaPet do
-                    if not _G.AutoEggAttivo then break end
+                    if not _G.AutoEggAttivo then
+                        break
+                    end
+
                     local pet = listaPet[i]
-                    
-                    -- Filtro protettivo: scrive nei log ogni singola decisione
+
                     if pet.Name ~= PET_DA_SALVARE then
-                        print("[AUTO-SELL] Trovato pet comune: " .. tostring(pet.Name) .. " -> Tento la vendita...")
-                        local sellSuccess = pcall(function()
+                        print(
+                            "[AUTO-SELL] Rilevato pet comune: "
+                            .. tostring(pet.Name)
+                            .. " -> Vendo..."
+                        )
+
+                        pcall(function()
                             sellPetEvent:FireServer(pet)
                         end)
-                        if sellSuccess then
-                            print("[AUTO-SELL SUCCESS] Venduto: " .. tostring(pet.Name))
-                        else
-                            print("[AUTO-SELL ERROR] Impossibile vendere il pet dal server.")
-                        end
                     else
-                        print("[MEGA DROP - COMPRESO!] Trovato l'1% -> " .. PET_DA_SALVARE .. "! Filtro bloccato, pet salvato.")
+                        print(
+                            "[MEGA DROP DETECTED!] "
+                            .. PET_DA_SALVARE
+                            .. " salvato con successo!"
+                        )
                     end
                 end
             else
-                print("[PATH ERROR] Impossibile trovare la cartella dei Pet in questo istante.")
+                -- Fallback nel Backpack
+                print(
+                    "[FALLBACK] Tento pulizia forzata tramite scansione dell'inventario..."
+                )
+
+                local inv = lPlayer:FindFirstChildOfClass("Backpack")
+
+                if inv then
+                    for _, item in ipairs(inv:GetChildren()) do
+                        if item.Name ~= PET_DA_SALVARE
+                            and (
+                                item:Card("Pet")
+                                or item.ClassName:match("Pet")
+                            )
+                        then
+                            sellPetEvent:FireServer(item)
+                        end
+                    end
+                end
             end
-            
+
             task.wait(0.3)
         end
+
         eggThreadAttivo = false
-        print("[EGG CORE] Loop completamente arrestato.")
+
+        print("[EGG CORE] Loop completamente terminato.")
     end)
 end
 
 function AvviaAutoEgg()
-    if eggThreadAttivo then return end
+    if eggThreadAttivo then
+        return
+    end
+
     eggThreadAttivo = true
     eseguiAutoEgg()
 end
 
 --===================================================================================
--- CREAZIONE INTERFACCIA GRAFICA COMPATTA CON TOGGLES COMPLETI (ALTEZZA 160)
+-- CREAZIONE INTERFACCIA GRAFICA COMPATTA CON TOGGLES COMPLETI
 --===================================================================================
+
 local function CreaInterfaccia()
     local screenName = "MuscleLegends_Egg_Gui"
     local vecchioScreen = pGui:FindFirstChild(screenName)
-    if vecchioScreen then vecchioScreen:Destroy() end
+
+    if vecchioScreen then
+        vecchioScreen:Destroy()
+    end
 
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = screenName
@@ -115,7 +196,7 @@ local function CreaInterfaccia()
     Title.Name = "Title"
     Title.Size = UDim2.new(1, 0, 0, 35)
     Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-    Title.Text = "TRIXADE EGG LOGS v6"
+    Title.Text = "TRIXADE EGG LOGS v7"
     Title.TextColor3 = Color3.fromRGB(255, 215, 0)
     Title.TextSize = 13
     Title.Font = Enum.Font.SourceSansBold
@@ -125,28 +206,54 @@ local function CreaInterfaccia()
     TitleCorner.CornerRadius = UDim.new(0, 10)
     TitleCorner.Parent = Title
 
-    -- Drag Touch Mobile Delta Fix
-    local dragging, dragInput, dragStart, startPos
+    -- Drag Touch Mobile
+    local dragging
+    local dragInput
+    local dragStart
+    local startPos
+
     Title.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true; dragStart = input.Position; startPos = MainFrame.Position
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch
+        then
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
+
             input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
             end)
         end
     end)
+
     Title.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch
+        then
             dragInput = input
         end
     end)
-    local dragConnection = UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging and MainFrame.Parent then
-            local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
 
+    local dragConnection =
+        UserInputService.InputChanged:Connect(function(input)
+            if input == dragInput
+                and dragging
+                and MainFrame.Parent
+            then
+                local delta = input.Position - dragStart
+
+                MainFrame.Position = UDim2.new(
+                    startPos.X.Scale,
+                    startPos.X.Offset + delta.X,
+                    startPos.Y.Scale,
+                    startPos.Y.Offset + delta.Y
+                )
+            end
+        end)
+
+    -- Farm button
     local FarmButton = Instance.new("TextButton")
     FarmButton.Name = "FarmButton"
     FarmButton.Size = UDim2.new(0, 200, 0, 40)
@@ -167,8 +274,8 @@ local function CreaInterfaccia()
     InfoStatus.Size = UDim2.new(0, 200, 0, 30)
     InfoStatus.Position = UDim2.new(0.5, -100, 0, 105)
     InfoStatus.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    InfoStatus.Text = "💎 LOG ATTIVI (APEX FILTER)"
-    InfoStatus.TextColor3 = Color3.fromRGB(100, 255, 255)
+    InfoStatus.Text = "💎 PATH SCANNER OPERATIONAL"
+    InfoStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
     InfoStatus.TextSize = 11
     InfoStatus.Font = Enum.Font.SourceSansBold
     InfoStatus.Parent = MainFrame
@@ -179,18 +286,27 @@ local function CreaInterfaccia()
 
     FarmButton.MouseButton1Click:Connect(function()
         _G.AutoEggAttivo = not _G.AutoEggAttivo
+
         if _G.AutoEggAttivo then
-            FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-            FarmButton.Text = "FARMING LOGS ACTIVE..."
+            FarmButton.BackgroundColor3 =
+                Color3.fromRGB(50, 180, 50)
+
+            FarmButton.Text =
+                "FARMING & AUTO-SELL ACTIVE"
+
             AvviaAutoEgg()
         else
-            FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-            FarmButton.Text = "AUTO EGG: DISATTIVATO"
+            FarmButton.BackgroundColor3 =
+                Color3.fromRGB(200, 50, 50)
+
+            FarmButton.Text =
+                "AUTO EGG: DISATTIVATO"
         end
     end)
 
     -- CONTROLLO MINIMIZZA
     local minimized = false
+
     local MinButton = Instance.new("TextButton")
     MinButton.Name = "MinButton"
     MinButton.Size = UDim2.new(0, 26, 0, 22)
@@ -224,27 +340,50 @@ local function CreaInterfaccia()
     CloseCorner.CornerRadius = UDim.new(0, 5)
     CloseCorner.Parent = CloseButton
 
-    local content = { FarmButton, InfoStatus }
+    local content = {
+        FarmButton,
+        InfoStatus
+    }
 
     MinButton.MouseButton1Click:Connect(function()
         minimized = not minimized
+
         if minimized then
             MainFrame.Size = UDim2.new(0, 240, 0, 35)
-            for i = 1, #content do if content[i] then content[i].Visible = false end end
+
+            for i = 1, #content do
+                if content[i] then
+                    content[i].Visible = false
+                end
+            end
+
             MinButton.Text = "+"
         else
             MainFrame.Size = UDim2.new(0, 240, 0, 160)
-            for i = 1, #content do if content[i] then content[i].Visible = true end end
+
+            for i = 1, #content do
+                if content[i] then
+                    content[i].Visible = true
+                end
+            end
+
             MinButton.Text = "—"
         end
     end)
 
     CloseButton.MouseButton1Click:Connect(function()
         _G.AutoEggAttivo = false
-pcall(function() if dragConnection then dragConnection:Disconnect() end end)
-ScreenGui:Destroy()
-print("[GUI] Chiusura completata.")
-end)
+
+        pcall(function()
+            if dragConnection then
+                dragConnection:Disconnect()
+            end
+        end)
+
+        ScreenGui:Destroy()
+
+        print("[GUI] Chiusura completata.")
+    end)
 end
 
 CreaInterfaccia()
