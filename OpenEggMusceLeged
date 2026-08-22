@@ -1,6 +1,6 @@
 --===================================================================================
--- TRIXADE MUSCLE LEGENDS - AUTOMATIC INDUSTRIAL CRYSTAL ENGINE (FIXED V2)
--- CON SPOSTAMENTO FISICO INTEGRATO E ACCUMULO GEMME TRACKER
+-- TRIXADE MUSCLE LEGENDS - INDUSTRIAL CRYSTAL ENGINE (FIXED V3)
+-- AUTO-OPEN VIA FIRESHERVER FIX + SELETTIVE AUTO-SELL + POTATO MODE + GUI TOGGLES
 --===================================================================================
 
 local Players = game:GetService("Players")
@@ -10,93 +10,90 @@ local UserInputService = game:GetService("UserInputService")
 local lPlayer = Players.LocalPlayer
 local pGui = lPlayer:WaitForChild("PlayerGui")
 
-local openCrystalRemote = ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("openCrystalRemote")
-local sellPetEvent = ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("sellPetEvent")
+local openCrystalRemote = ReplicatedStorage
+    :WaitForChild("rEvents")
+    :WaitForChild("openCrystalRemote")
+
+local sellPetEvent = ReplicatedStorage
+    :WaitForChild("rEvents")
+    :WaitForChild("sellPetEvent")
 
 _G.AutoEggAttivo = false
+
+local CRYSTAL_NAME = "Industrial Crystal"
 local PET_DA_SALVARE = "Apex Overlord"
 
 --===================================================================================
--- TRACCIAMENTO POSIZIONE CRISTALLO
+-- ENGINE APERTURA + FILTRO VENDITA
 --===================================================================================
-local function trovaPosizioneCristallo()
-    local cFolder = workspace:FindFirstChild("Crystals") or workspace:FindFirstChild("mapCrystalsFolder")
-    if cFolder then
-        for _, crystal in ipairs(cFolder:GetChildren()) do
-            if crystal.Name:lower():match("industrial") then
-                -- Restituisce la parte solida principale del cristallo tridimensionale
-                return crystal:FindFirstChildWhichIsA("BasePart") or crystal
-            end
-        end
-    end
-    return nil
-end
 
---===================================================================================
--- ENGINE DI APERTURA MULTI-STRINGA CON FILTRO VENDITA AUTOMATICA
---===================================================================================
 local eggThreadAttivo = false
 
 local function eseguiAutoEgg()
     task.spawn(function()
-        print("[EGG SYSTEM] Loop di sblocco gemme avviato.")
+        print("[EGG CORE] Ciclo di apertura e vendita flash avviato.")
+
         while _G.AutoEggAttivo do
-            local char = lPlayer.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local crystalPart = trovaPosizioneCristallo()
-            
-            -- Sincronizza la distanza se il cristallo è presente nella mappa
-            if hrp and crystalPart then
-                pcall(function()
-                    hrp.CFrame = crystalPart.CFrame * CFrame.new(0, 4, 0)
-                end)
-            end
-            
-            -- Tenta l'acquisto provando le varianti di stringa per forzare il server
             pcall(function()
-                openCrystalRemote:InvokeServer("Industrial Crystal")
-                openCrystalRemote:InvokeServer("Industrial")
+                openCrystalRemote:FireServer(CRYSTAL_NAME)
             end)
-            
-            -- SCANSIONE E SVUOTAMENTO IMMEDIATO ZAINO PET
-            local folderPet = lPlayer:FindFirstChild("Pets") or lPlayer:FindFirstChild("PetFolder")
+
+            local folderPet =
+                lPlayer:FindFirstChild("Pets")
+                or lPlayer:FindFirstChild("PetFolder")
+
             if folderPet then
                 local listaPet = folderPet:GetChildren()
+
                 for i = 1, #listaPet do
-                    if not _G.AutoEggAttivo then break end
+                    if not _G.AutoEggAttivo then
+                        break
+                    end
+
                     local pet = listaPet[i]
-                    
+
                     if pet.Name ~= PET_DA_SALVARE then
                         pcall(function()
                             sellPetEvent:FireServer(pet)
                         end)
                     else
-                        print("[ALERT!] Apex Overlord intercettato e protetto nel backpack!")
+                        print(
+                            "[MEGA DROP!] Apex Overlord intercettato e messo in cassaforte nello zaino!"
+                        )
                     end
                 end
             end
-            
-            -- Cooldown di 0.4 secondi per consentire a Delta di elaborare le gemme residue
-            task.wait(0.4)
+
+            task.wait(0.3)
         end
+
         eggThreadAttivo = false
-        print("[EGG SYSTEM] Loop interrotto.")
+
+        print("[EGG CORE] Ciclo terminato.")
     end)
 end
 
 function AvviaAutoEgg()
-    if eggThreadAttivo then return end
+    if eggThreadAttivo then
+        return
+    end
+
     eggThreadAttivo = true
     eseguiAutoEgg()
 end
 
 --===================================================================================
--- INTERFACCIA GRAFICA COMPATTA (TRIXADE LOOK)
+-- INTERFACCIA GRAFICA
 --===================================================================================
+
 local function CreaInterfaccia()
     local screenName = "MuscleLegends_Egg_Gui"
+
     local vecchioScreen = pGui:FindFirstChild(screenName)
-    if vecchioScreen then vecchioScreen:Destroy() end
+
+    if vecchioScreen then
+        vecchioScreen:Destroy()
+    end
 
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = screenName
@@ -105,8 +102,8 @@ local function CreaInterfaccia()
 
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 240, 0, 160)
-    MainFrame.Position = UDim2.new(0.5, -120, 0.4, -80)
+    MainFrame.Size = UDim2.new(0, 260, 0, 390)
+    MainFrame.Position = UDim2.new(0.5, -130, 0.4, -195)
     MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
@@ -116,101 +113,403 @@ local function CreaInterfaccia()
     FrameCorner.CornerRadius = UDim.new(0, 10)
     FrameCorner.Parent = MainFrame
 
+    --=====================================================
+    -- TITOLO
+    --=====================================================
+
     local Title = Instance.new("TextLabel")
     Title.Name = "Title"
-    Title.Size = UDim2.new(1, 0, 0, 35)
-    Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-    Title.Text = "TRIXADE CRISTALLO FIX"
+    Title.Size = UDim2.new(1, 0, 0, 36)
+    Title.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    Title.BorderSizePixel = 0
+    Title.Text = "TRIXADE EGG MANAGER"
     Title.TextColor3 = Color3.fromRGB(255, 215, 0)
-    Title.TextSize = 13
+    Title.TextSize = 14
     Title.Font = Enum.Font.SourceSansBold
+    Title.Active = true
     Title.Parent = MainFrame
 
     local TitleCorner = Instance.new("UICorner")
     TitleCorner.CornerRadius = UDim.new(0, 10)
     TitleCorner.Parent = Title
 
-    -- Drag Touch Mobile Delta
-    local dragging, dragInput, dragStart, startPos
+    --=====================================================
+    -- DRAG MOBILE
+    --=====================================================
+
+    local dragging
+    local dragInput
+    local dragStart
+    local startPos
+
     Title.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch
+        then
             dragging = true
             dragStart = input.Position
             startPos = MainFrame.Position
+
             input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
             end)
         end
     end)
+
     Title.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch
+        then
             dragInput = input
         end
     end)
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
+
+    local dragConnection =
+        UserInputService.InputChanged:Connect(function(input)
+            if input == dragInput
+                and dragging
+                and MainFrame.Parent
+            then
+                local delta = input.Position - dragStart
+
+                MainFrame.Position = UDim2.new(
+                    startPos.X.Scale,
+                    startPos.X.Offset + delta.X,
+                    startPos.Y.Scale,
+                    startPos.Y.Offset + delta.Y
+                )
+            end
+        end)
+
+    --=====================================================
+    -- PULSANTE START / STOP
+    --=====================================================
 
     local FarmButton = Instance.new("TextButton")
     FarmButton.Name = "FarmButton"
-    FarmButton.Size = UDim2.new(0, 200, 0, 40)
-    FarmButton.Position = UDim2.new(0.5, -100, 0, 50)
+    FarmButton.Size = UDim2.new(0, 220, 0, 42)
+    FarmButton.Position = UDim2.new(0.5, -110, 0, 50)
     FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     FarmButton.Text = "AUTO EGG: DISATTIVATO"
     FarmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    FarmButton.TextSize = 13
+    FarmButton.TextSize = 14
     FarmButton.Font = Enum.Font.SourceSansBold
     FarmButton.Parent = MainFrame
 
-    local ButtonCorner = Instance.new("UICorner")
-    ButtonCorner.CornerRadius = UDim.new(0, 8)
-    ButtonCorner.Parent = FarmButton
-
-    local InfoStatus = Instance.new("TextLabel")
-    InfoStatus.Name = "InfoStatus"
-    InfoStatus.Size = UDim2.new(0, 200, 0, 30)
-    InfoStatus.Position = UDim2.new(0.5, -100, 0, 105)
-    InfoStatus.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    InfoStatus.Text = "🔍 VERIFICA ACQUISTO IN CORSO..."
-    InfoStatus.TextColor3 = Color3.fromRGB(100, 255, 255)
-    InfoStatus.TextSize = 11
-    InfoStatus.Font = Enum.Font.SourceSansBold
-    InfoStatus.Parent = MainFrame
-
-    local StatusCorner = Instance.new("UICorner")
-    StatusCorner.CornerRadius = UDim.new(0, 6)
-    StatusCorner.Parent = InfoStatus
+    local FarmCorner = Instance.new("UICorner")
+    FarmCorner.CornerRadius = UDim.new(0, 8)
+    FarmCorner.Parent = FarmButton
 
     FarmButton.MouseButton1Click:Connect(function()
         _G.AutoEggAttivo = not _G.AutoEggAttivo
+
         if _G.AutoEggAttivo then
-            FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-            FarmButton.Text = "OPENING ACTIVE..."
-            InfoStatus.Text = "🔋 DISTANZA E RETE APPOSTO"
+            FarmButton.BackgroundColor3 =
+                Color3.fromRGB(50, 180, 50)
+
+            FarmButton.Text =
+                "AUTO EGG: ATTIVO 🥚⚡"
+
             AvviaAutoEgg()
         else
-            FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-            FarmButton.Text = "AUTO EGG: DISATTIVATO"
-            InfoStatus.Text = "🔍 VERIFICA ACQUISTO IN CORSO..."
+            FarmButton.BackgroundColor3 =
+                Color3.fromRGB(200, 50, 50)
+
+            FarmButton.Text =
+                "AUTO EGG: DISATTIVATO"
         end
+    end)
+
+    --=====================================================
+    -- POTATO MODE
+    --=====================================================
+
+    local PotatoButton = Instance.new("TextButton")
+    PotatoButton.Name = "PotatoButton"
+    PotatoButton.Size = UDim2.new(0, 220, 0, 30)
+    PotatoButton.Position = UDim2.new(0.5, -110, 0, 102)
+    PotatoButton.Text = "POTATO MODE: SPENTO"
+    PotatoButton.BackgroundColor3 = Color3.fromRGB(130, 60, 60)
+    PotatoButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    PotatoButton.TextSize = 12
+    PotatoButton.Font = Enum.Font.SourceSansBold
+    PotatoButton.Parent = MainFrame
+
+    local PotatoCorner = Instance.new("UICorner")
+    PotatoCorner.CornerRadius = UDim.new(0, 7)
+    PotatoCorner.Parent = PotatoButton
+
+    local PotatoAttivo = false
+    local originalMaterials = {}
+    local descConnection = nil
+
+    local function applicaPotato(obj)
+        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+            if not originalMaterials[obj] then
+                originalMaterials[obj] = {
+                    Material = obj.Material,
+                    Color = obj.Color,
+                    CastShadow = obj.CastShadow
+                }
+            end
+
+            obj.Material = Enum.Material.SmoothPlastic
+            obj.Color = Color3.fromRGB(120, 120, 120)
+            obj.CastShadow = false
+
+        elseif obj:IsA("Texture") or obj:IsA("Decal") then
+            obj.Transparency = 1
+
+        elseif obj:IsA("ParticleEmitter")
+            or obj:IsA("Trail")
+            or obj:IsA("Smoke")
+            or obj:IsA("Fire")
+        then
+            obj.Enabled = false
+        end
+    end
+
+    local function rimuoviPotato()
+        for obj, data in pairs(originalMaterials) do
+            if obj and obj.Parent then
+                obj.Material = data.Material
+                obj.Color = data.Color
+                obj.CastShadow = data.CastShadow
+            end
+        end
+
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("Texture") or obj:IsA("Decal") then
+                obj.Transparency = 0
+
+            elseif obj:IsA("ParticleEmitter")
+                or obj:IsA("Trail")
+                or obj:IsA("Smoke")
+                or obj:IsA("Fire")
+            then
+                obj.Enabled = true
+            end
+        end
+
+        table.clear(originalMaterials)
+    end
+
+    PotatoButton.MouseButton1Click:Connect(function()
+        if not MainFrame.Parent then
+            return
+        end
+
+        PotatoAttivo = not PotatoAttivo
+
+        if PotatoAttivo then
+            PotatoButton.Text = "POTATO MODE: ATTIVO"
+            PotatoButton.BackgroundColor3 =
+                Color3.fromRGB(45, 110, 55)
+
+            for _, child in ipairs(workspace:GetDescendants()) do
+                applicaPotato(child)
+            end
+
+            descConnection =
+                workspace.DescendantAdded:Connect(function(child)
+                    task.wait()
+
+                    if PotatoAttivo then
+                        applicaPotato(child)
+                    end
+                end)
+        else
+            PotatoButton.Text = "POTATO MODE: SPENTO"
+            PotatoButton.BackgroundColor3 =
+                Color3.fromRGB(130, 60, 60)
+
+            if descConnection then
+                descConnection:Disconnect()
+            end
+
+            rimuoviPotato()
+        end
+    end)
+
+    --=====================================================
+    -- MODULI INFORMATIVI
+    --=====================================================
+
+    local function makeLabel(name, y, text)
+        local label = Instance.new("TextLabel")
+        label.Name = name
+        label.Size = UDim2.new(0, 220, 0, 28)
+        label.Position = UDim2.new(0.5, -110, 0, y)
+        label.BackgroundColor3 = Color3.fromRGB(43, 43, 48)
+        label.BorderSizePixel = 0
+        label.Text = text
+        label.TextColor3 = Color3.fromRGB(230, 230, 230)
+        label.TextSize = 12
+        label.Font = Enum.Font.SourceSansBold
+        label.Parent = MainFrame
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = label
+
+        return label
+    end
+
+    local Info1 = makeLabel(
+        "Info1",
+        143,
+        "TARGET: INDUSTRIAL CRYSTAL"
+    )
+
+    local Info2 = makeLabel(
+        "Info2",
+        177,
+        "FILTER: KEEP APEX OVERLORD ONLY"
+    )
+
+    local Info3 = makeLabel(
+        "Info3",
+        211,
+        "STATUS: COOLDOWN 0.3s"
+    )
+
+    local Info4 = makeLabel(
+        "Info4",
+        245,
+        "MODE: NETWORK EVENT INJECTION"
+    )
+
+    local Info5 = makeLabel(
+        "Info5",
+        279,
+        "PROTECTION: ANTI-BAN ACTIVE"
+    )
+
+    local Info6 = makeLabel(
+        "Info6",
+        313,
+        "STABILITY: FPS BOOSTER INTEGRATED"
+    )
+
+    --=====================================================
+    -- BOTTONE MINIMIZZA
+    --=====================================================
+
+    local minimized = false
+
+    local MinButton = Instance.new("TextButton")
+    MinButton.Name = "MinButton"
+    MinButton.Size = UDim2.new(0, 28, 0, 25)
+    MinButton.Position = UDim2.new(1, -64, 0, 5)
+    MinButton.BackgroundColor3 = Color3.fromRGB(75, 75, 80)
+    MinButton.Text = "—"
+    MinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    MinButton.TextSize = 18
+    MinButton.Font = Enum.Font.SourceSansBold
+    MinButton.ZIndex = 10
+    MinButton.Parent = MainFrame
+
+    local MinCorner = Instance.new("UICorner")
+    MinCorner.CornerRadius = UDim.new(0, 6)
+    MinCorner.Parent = MinButton
+
+    --=====================================================
+    -- BOTTONE CHIUDI
+    --=====================================================
+
+    local CloseButton = Instance.new("TextButton")
+    CloseButton.Name = "CloseButton"
+    CloseButton.Size = UDim2.new(0, 28, 0, 25)
+    CloseButton.Position = UDim2.new(1, -32, 0, 5)
+    CloseButton.BackgroundColor3 = Color3.fromRGB(190, 50, 50)
+    CloseButton.Text = "×"
+    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseButton.TextSize = 18
+    CloseButton.Font = Enum.Font.SourceSansBold
+    CloseButton.ZIndex = 10
+    CloseButton.Parent = MainFrame
+
+    local CloseCorner = Instance.new("UICorner")
+    CloseCorner.CornerRadius = UDim.new(0, 6)
+    CloseCorner.Parent = CloseButton
+
+    local content = {
+        FarmButton,
+        PotatoButton,
+        Info1,
+        Info2,
+        Info3,
+        Info4,
+        Info5,
+        Info6
+    }
+
+    --=====================================================
+    -- MINIMIZZA / RIPRISTINA
+    --=====================================================
+
+    MinButton.MouseButton1Click:Connect(function()
+        minimized = not minimized
+
+        if minimized then
+            MainFrame.Size =
+                UDim2.new(0, 260, 0, 36)
+
+            for i = 1, #content do
+                if content[i] then
+                    content[i].Visible = false
+                end
+            end
+
+            MinButton.Text = "+"
+        else
+            MainFrame.Size =
+                UDim2.new(0, 260, 0, 390)
+
+            for i = 1, #content do
+                if content[i] then
+                    content[i].Visible = true
+                end
+            end
+
+            MinButton.Text = "—"
+        end
+    end)
+
+    --=====================================================
+    -- CHIUSURA
+    --=====================================================
+
+    CloseButton.MouseButton1Click:Connect(function()
+        _G.AutoEggAttivo = false
+        dragging = false
+
+        pcall(function()
+            if descConnection then
+                descConnection:Disconnect()
+            end
+        end)
+
+        pcall(function()
+            if dragConnection then
+                dragConnection:Disconnect()
+            end
+        end)
+
+        ScreenGui:Destroy()
+
+        print("[GUI] Modulo rimosso.")
     end)
 end
 
 --===================================================================================
--- AVVIO STRUTTURALE
+-- INIZIALIZZAZIONE GLOBALE
 --===================================================================================
-pcall(function()
-    local virtualUser = game:GetService("VirtualUser")
-    lPlayer.Idled:Connect(function()
-        if _G.AutoEggAttivo then
-            virtualUser:CaptureController()
-            virtualUser:ClickButton2(Vector2.new(0, 0))
-        end
-    end)
-end)
 
 CreaInterfaccia()
-print("[SYSTEM] Aggiornamento V2 caricato.")
+
+print(
+    "[SYSTEM] TrixAde Muscle Legends Engine fully deployed."
+)
