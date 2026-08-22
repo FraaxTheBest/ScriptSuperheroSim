@@ -1,6 +1,6 @@
 --===================================================================================
--- TRIXADE MUSCLE LEGENDS - INDUSTRIAL CRYSTAL AUTOFARM (PRO-VERSION)
--- FIX INVOKESERVER CORRETTO + AUTO-SELL SELETTIVO + MINIMIZZA/CHIUDI
+-- TRIXADE MUSCLE LEGENDS - INDUSTRIAL CRYSTAL AUTOFARM (PRO ANTI-CACHE VERSION)
+-- DYNAMIC INJECTION ENGINE + AUTO-SELL FILTER + MINIMIZZA/CHIUDI
 --===================================================================================
 
 local Players = game:GetService("Players")
@@ -18,46 +18,49 @@ local CRYSTAL_NAME = "Industrial Crystal"
 local PET_DA_SALVARE = "Apex Overlord"
 
 --===================================================================================
--- ENGINE DI APERTURA E FILTRO VENDITA PET
+-- ENGINE DI APERTURA IBRIDO (TENTA ENTRAMBE LE STRADE PER BYPASSARE GLI ERRORI)
 --===================================================================================
 local eggThreadAttivo = false
 
 local function eseguiAutoEgg()
     task.spawn(function()
-        print("[EGG CORE] Avvio ciclo d'acquisto sbloccato.")
+        print("[EGG CORE] Loop di sblocco forzato avviato.")
         while _G.AutoEggAttivo do
             
-            -- FIX SINTASSI: Chiama il server con la s minuscola (InvokeServer)
-            local successo, risultato = pcall(function()
-                return openCrystalRemote:InvokeServer(CRYSTAL_NAME)
+            -- STRATEGIA D'ATTACCO IBRIDA: Prova sia come Function che come Event in parallelo
+            pcall(function()
+                openCrystalRemote:InvokeServer(CRYSTAL_NAME)
+            end)
+            pcall(function()
+                openCrystalRemote:FireServer(CRYSTAL_NAME)
             end)
             
-            -- SCANSIONE CARTELLA PET (CORRETTA DENTRO LEADERSTATS)
-            local leaderstats = lPlayer:FindFirstChild("leaderstats")
-            local folderPet = leaderstats and leaderstats:FindFirstChild("Pets")
-            
-            if folderPet then
-                local listaPet = folderPet:GetChildren()
-                for i = 1, #listaPet do
-                    if not _G.AutoEggAttivo then break end
-                    local pet = listaPet[i]
-                    
-                    -- Se il nome NON è Apex Overlord, lo vende all'istante
-                    if pet.Name ~= PET_DA_SALVARE then
-                        pcall(function()
-                            sellPetEvent:FireServer(pet)
-                        end)
-                    else
-                        print("[MEGA DROP!] Apex Overlord trovato e salvato dal filtro!")
+            -- SCANSIONE CARTELLA PET (CONTROLLO INCROCIATO SU TUTTI I PERCORSI INTERNI)
+            local function controllaEVendi(folder)
+                if folder then
+                    local listaPet = folder:GetChildren()
+                    for i = 1, #listaPet do
+                        if not _G.AutoEggAttivo then break end
+                        local pet = listaPet[i]
+                        if pet.Name ~= PET_DA_SALVARE then
+                            pcall(function() sellPetEvent:FireServer(pet) end)
+                        else
+                            print("[MEGA DROP!] Apex Overlord protetto nello zaino!")
+                        end
                     end
                 end
             end
             
-            -- Pausa fissa a frame per non far laggare BlueStacks
+            controllaEVendi(lPlayer:FindFirstChild("Pets"))
+            controllaEVendi(lPlayer:FindFirstChild("PetFolder"))
+            if lPlayer:FindFirstChild("leaderstats") then
+                controllaEVendi(lPlayer.leaderstats:FindFirstChild("Pets"))
+            end
+            
             task.wait(0.2)
         end
         eggThreadAttivo = false
-        print("[EGG CORE] Ciclo terminato.")
+        print("[EGG CORE] Loop arrestato.")
     end)
 end
 
@@ -68,7 +71,7 @@ function AvviaAutoEgg()
 end
 
 --===================================================================================
--- CREAZIONE INTERFACCIA GRAFICA COMPATTA (CON DISCONNESSIONI SICURE)
+-- CREAZIONE INTERFACCIA GRAFICA COMPATTA CON TOGGLES COMPLETI (ALTEZZA 160)
 --===================================================================================
 local function CreaInterfaccia()
     local screenName = "MuscleLegends_Egg_Gui"
@@ -97,7 +100,7 @@ local function CreaInterfaccia()
     Title.Name = "Title"
     Title.Size = UDim2.new(1, 0, 0, 35)
     Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-    Title.Text = "TRIXADE EGG MANAGER"
+    Title.Text = "TRIXADE EGG MANAGER v4"
     Title.TextColor3 = Color3.fromRGB(255, 215, 0)
     Title.TextSize = 13
     Title.Font = Enum.Font.SourceSansBold
@@ -149,7 +152,7 @@ local function CreaInterfaccia()
     InfoStatus.Size = UDim2.new(0, 200, 0, 30)
     InfoStatus.Position = UDim2.new(0.5, -100, 0, 105)
     InfoStatus.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    InfoStatus.Text = "💎 KEEP: APEX OVERLORD ONLY"
+    InfoStatus.Text = "💎 FILTER ACTIVE: KEEP APEX"
     InfoStatus.TextColor3 = Color3.fromRGB(100, 255, 255)
     InfoStatus.TextSize = 11
     InfoStatus.Font = Enum.Font.SourceSansBold
@@ -163,7 +166,7 @@ local function CreaInterfaccia()
         _G.AutoEggAttivo = not _G.AutoEggAttivo
         if _G.AutoEggAttivo then
             FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-            FarmButton.Text = "OPENING ACTIVE... 🥚⚡"
+            FarmButton.Text = "OPENING HYBRID ACTIVE..."
             AvviaAutoEgg()
         else
             FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
@@ -182,6 +185,7 @@ local function CreaInterfaccia()
     MinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     MinButton.TextSize = 16
     MinButton.Font = Enum.Font.SourceSansBold
+    MinButton.ZIndex = 10
     MinButton.Parent = MainFrame
 
     local MinCorner = Instance.new("UICorner")
@@ -198,6 +202,7 @@ local function CreaInterfaccia()
     CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     CloseButton.TextSize = 16
     CloseButton.Font = Enum.Font.SourceSansBold
+    CloseButton.ZIndex = 10
     CloseButton.Parent = MainFrame
 
     local CloseCorner = Instance.new("UICorner")
@@ -210,11 +215,11 @@ local function CreaInterfaccia()
         minimized = not minimized
         if minimized then
             MainFrame.Size = UDim2.new(0, 240, 0, 35)
-            for i = 1, #content do content[i].Visible = false end
+            for i = 1, #content do if content[i] then content[i].Visible = false end end
             MinButton.Text = "+"
         else
             MainFrame.Size = UDim2.new(0, 240, 0, 160)
-            for i = 1, #content do content[i].Visible = true end
+            for i = 1, #content do if content[i] then content[i].Visible = true end end
             MinButton.Text = "—"
         end
     end)
