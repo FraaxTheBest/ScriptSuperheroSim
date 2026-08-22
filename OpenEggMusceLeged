@@ -1,6 +1,6 @@
 --===================================================================================
--- TRIXADE MUSCLE LEGENDS - INDUSTRIAL CRYSTAL AUTOFARM (PRO ANTI-CACHE VERSION)
--- DYNAMIC INJECTION ENGINE + AUTO-SELL FILTER + MINIMIZZA/CHIUDI
+-- TRIXADE MUSCLE LEGENDS - TALKING EGG CORE (FIXED LOGS)
+-- LOG VERBALIZZATI DOPO APERTURA + AUTO-SELL FILTER + MINIMIZZA/CHIUDI
 --===================================================================================
 
 local Players = game:GetService("Players")
@@ -18,49 +18,64 @@ local CRYSTAL_NAME = "Industrial Crystal"
 local PET_DA_SALVARE = "Apex Overlord"
 
 --===================================================================================
--- ENGINE DI APERTURA IBRIDO (TENTA ENTRAMBE LE STRADE PER BYPASSARE GLI ERRORI)
+-- ENGINE DI APERTURA E TRACCIAMENTO LOG DOPO ACQUISTO
 --===================================================================================
 local eggThreadAttivo = false
 
 local function eseguiAutoEgg()
     task.spawn(function()
-        print("[EGG CORE] Loop di sblocco forzato avviato.")
+        print("[EGG CORE] Loop avviato. In attesa di aperture...")
         while _G.AutoEggAttivo do
             
-            -- STRATEGIA D'ATTACCO IBRIDA: Prova sia come Function che come Event in parallelo
-            pcall(function()
-                openCrystalRemote:InvokeServer(CRYSTAL_NAME)
-            end)
-            pcall(function()
-                openCrystalRemote:FireServer(CRYSTAL_NAME)
+            -- 1. ESEGUE L'ACQUISTO
+            local successo, risultato = pcall(function()
+                return openCrystalRemote:InvokeServer(CRYSTAL_NAME)
             end)
             
-            -- SCANSIONE CARTELLA PET (CONTROLLO INCROCIATO SU TUTTI I PERCORSI INTERNI)
-            local function controllaEVendi(folder)
-                if folder then
-                    local listaPet = folder:GetChildren()
-                    for i = 1, #listaPet do
-                        if not _G.AutoEggAttivo then break end
-                        local pet = listaPet[i]
-                        if pet.Name ~= PET_DA_SALVARE then
-                            pcall(function() sellPetEvent:FireServer(pet) end)
+            if successo then
+                print("[SERVER INPUT] Richiesta uovo inviata con successo. Attendo caricamento Pet...")
+                task.wait(0.2) -- Pausa obbligatoria per far comparire il pet nello zaino del server
+            else
+                print("[SERVER ERROR] Il server ha rifiutato l'acquisto dell'uovo.")
+            end
+            
+            -- 2. SCANSIONE RIGIDA E SCRITTURA NEI LOG DI OGNI AZIONE
+            local leaderstats = lPlayer:FindFirstChild("leaderstats")
+            local folderPet = leaderstats and leaderstats:FindFirstChild("Pets") or lPlayer:FindFirstChild("Pets")
+            
+            if folderPet then
+                local listaPet = folderPet:GetChildren()
+                if #listaPet == 0 then
+                    print("[INFO LOG] Zaino Pet attualmente vuoto o in aggiornamento.")
+                end
+                
+                for i = 1, #listaPet do
+                    if not _G.AutoEggAttivo then break end
+                    local pet = listaPet[i]
+                    
+                    -- Filtro protettivo: scrive nei log ogni singola decisione
+                    if pet.Name ~= PET_DA_SALVARE then
+                        print("[AUTO-SELL] Trovato pet comune: " .. tostring(pet.Name) .. " -> Tento la vendita...")
+                        local sellSuccess = pcall(function()
+                            sellPetEvent:FireServer(pet)
+                        end)
+                        if sellSuccess then
+                            print("[AUTO-SELL SUCCESS] Venduto: " .. tostring(pet.Name))
                         else
-                            print("[MEGA DROP!] Apex Overlord protetto nello zaino!")
+                            print("[AUTO-SELL ERROR] Impossibile vendere il pet dal server.")
                         end
+                    else
+                        print("[MEGA DROP - COMPRESO!] Trovato l'1% -> " .. PET_DA_SALVARE .. "! Filtro bloccato, pet salvato.")
                     end
                 end
+            else
+                print("[PATH ERROR] Impossibile trovare la cartella dei Pet in questo istante.")
             end
             
-            controllaEVendi(lPlayer:FindFirstChild("Pets"))
-            controllaEVendi(lPlayer:FindFirstChild("PetFolder"))
-            if lPlayer:FindFirstChild("leaderstats") then
-                controllaEVendi(lPlayer.leaderstats:FindFirstChild("Pets"))
-            end
-            
-            task.wait(0.2)
+            task.wait(0.3)
         end
         eggThreadAttivo = false
-        print("[EGG CORE] Loop arrestato.")
+        print("[EGG CORE] Loop completamente arrestato.")
     end)
 end
 
@@ -100,7 +115,7 @@ local function CreaInterfaccia()
     Title.Name = "Title"
     Title.Size = UDim2.new(1, 0, 0, 35)
     Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-    Title.Text = "TRIXADE EGG MANAGER v4"
+    Title.Text = "TRIXADE EGG LOGS v6"
     Title.TextColor3 = Color3.fromRGB(255, 215, 0)
     Title.TextSize = 13
     Title.Font = Enum.Font.SourceSansBold
@@ -152,7 +167,7 @@ local function CreaInterfaccia()
     InfoStatus.Size = UDim2.new(0, 200, 0, 30)
     InfoStatus.Position = UDim2.new(0.5, -100, 0, 105)
     InfoStatus.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    InfoStatus.Text = "💎 FILTER ACTIVE: KEEP APEX"
+    InfoStatus.Text = "💎 LOG ATTIVI (APEX FILTER)"
     InfoStatus.TextColor3 = Color3.fromRGB(100, 255, 255)
     InfoStatus.TextSize = 11
     InfoStatus.Font = Enum.Font.SourceSansBold
@@ -166,7 +181,7 @@ local function CreaInterfaccia()
         _G.AutoEggAttivo = not _G.AutoEggAttivo
         if _G.AutoEggAttivo then
             FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-            FarmButton.Text = "OPENING HYBRID ACTIVE..."
+            FarmButton.Text = "FARMING LOGS ACTIVE..."
             AvviaAutoEgg()
         else
             FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
@@ -174,7 +189,7 @@ local function CreaInterfaccia()
         end
     end)
 
-    -- CONTROLLO MINIMIZZA (— / +)
+    -- CONTROLLO MINIMIZZA
     local minimized = false
     local MinButton = Instance.new("TextButton")
     MinButton.Name = "MinButton"
@@ -192,7 +207,7 @@ local function CreaInterfaccia()
     MinCorner.CornerRadius = UDim.new(0, 5)
     MinCorner.Parent = MinButton
 
-    -- CONTROLLO CHIUDI (×)
+    -- CONTROLLO CHIUDI
     local CloseButton = Instance.new("TextButton")
     CloseButton.Name = "CloseButton"
     CloseButton.Size = UDim2.new(0, 26, 0, 22)
@@ -226,10 +241,10 @@ local function CreaInterfaccia()
 
     CloseButton.MouseButton1Click:Connect(function()
         _G.AutoEggAttivo = false
-        pcall(function() if dragConnection then dragConnection:Disconnect() end end)
-        ScreenGui:Destroy()
-        print("[GUI] Chiusura completata.")
-    end)
+pcall(function() if dragConnection then dragConnection:Disconnect() end end)
+ScreenGui:Destroy()
+print("[GUI] Chiusura completata.")
+end)
 end
 
 CreaInterfaccia()
