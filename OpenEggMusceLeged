@@ -1,0 +1,198 @@
+--===================================================================================
+-- TRIXADE MUSCLE LEGENDS - AUTOMATIC INDUSTRIAL CRYSTAL ENGINE
+-- AUTO-OPEN + AUTO-SELL FILTER (KEEPS APEX OVERLORD ONLY)
+--===================================================================================
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local lPlayer = Players.LocalPlayer
+local pGui = lPlayer:WaitForChild("PlayerGui")
+
+local openCrystalRemote = ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("openCrystalRemote")
+local sellPetEvent = ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("sellPetEvent")
+
+_G.AutoEggAttivo = false
+local CRYSTAL_NAME = "Industrial Crystal"
+local PET_DA_SALVARE = "Apex Overlord"
+
+--===================================================================================
+-- ENGINE APERTURA E FILTRO VENDITA SELETTIVA
+--===================================================================================
+local eggThreadAttivo = false
+
+local function eseguiAutoEgg()
+    task.spawn(function()
+        print("[EGG CORE] Ciclo di apertura Industrial Crystal avviato.")
+        while _G.AutoEggAttivo do
+            -- 1. TENTA L'ACQUISTO DELL'UOVO VIA REMOTEFUNCTION
+            local successo, risultato = pcall(function()
+                return openCrystalRemote:InvokeServer(CRYSTAL_NAME)
+            end)
+            
+            -- 2. SCANSIONE IMMEDIATA DELLO ZAINO PER IL FILTRO VENDITA
+            local folderPet = lPlayer:FindFirstChild("Pets") or lPlayer:FindFirstChild("PetFolder")
+            if folderPet then
+                local listaPet = folderPet:GetChildren()
+                for i = 1, #listaPet do
+                    if not _G.AutoEggAttivo then break end
+                    local pet = listaPet[i]
+                    
+                    -- Se il nome NON corrisponde all'Apex Overlord, lo vende istantaneamente
+                    if pet.Name ~= PET_DA_SALVARE then
+                        pcall(function()
+                            sellPetEvent:FireServer(pet)
+                        end)
+                    else
+                        print("[MEGA DROP!] Apex Overlord trovato e salvato con successo dal filtro!")
+                    end
+                end
+            end
+            
+            -- Pausa fissa calibrata per non far frizzare l'applicazione Delta su Mobile
+            task.wait(0.3)
+        end
+        eggThreadAttivo = false
+        print("[EGG CORE] Ciclo terminato.")
+    end)
+end
+
+function AvviaAutoEgg()
+    if eggThreadAttivo then return end
+    eggThreadAttivo = true
+    eseguiAutoEgg()
+end
+
+--===================================================================================
+-- PROTEZIONE BASE ANTI-AFK
+--===================================================================================
+local idleConnection = nil
+local function InizializzaAntiAFK()
+    pcall(function()
+        local virtualUser = game:GetService("VirtualUser")
+        idleConnection = lPlayer.Idled:Connect(function()
+            if not _G.AutoEggAttivo then return end
+            virtualUser:CaptureController()
+            virtualUser:ClickButton2(Vector2.new(0, 0))
+        end)
+    end)
+end
+
+--===================================================================================
+-- CREAZIONE INTERFACCIA GRAFICA COMPATTA (STESSO STILE ICONICO)
+--===================================================================================
+local function CreaInterfaccia()
+    local screenName = "MuscleLegends_Egg_Gui"
+    local vecchioScreen = pGui:FindFirstChild(screenName)
+    if vecchioScreen then vecchioScreen:Destroy() end
+
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = screenName
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = pGui
+
+    -- Frame Piccolo Leggero anti-freeze (160 di altezza)
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 240, 0, 160)
+    MainFrame.Position = UDim2.new(0.5, -120, 0.4, -80)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Active = true
+    MainFrame.Parent = ScreenGui
+
+    -- Sistema di drag nativo Mobile Delta
+    local dragging, dragInput, dragStart, startPos
+    MainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    MainFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    local FrameCorner = Instance.new("UICorner")
+    FrameCorner.CornerRadius = UDim.new(0, 10)
+    FrameCorner.Parent = MainFrame
+
+    -- Titolo GUI
+    local Title = Instance.new("TextLabel")
+    Title.Name = "Title"
+    Title.Size = UDim2.new(1, 0, 0, 35)
+    Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    Title.Text = "TRIXADE EGG MANAGER"
+    Title.TextColor3 = Color3.fromRGB(255, 215, 0)
+    Title.TextSize = 13
+    Title.Font = Enum.Font.SourceSansBold
+    Title.Parent = MainFrame
+
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 10)
+    TitleCorner.Parent = Title
+
+    -- Pulsante START / STOP
+    local FarmButton = Instance.new("TextButton")
+    FarmButton.Name = "FarmButton"
+    FarmButton.Size = UDim2.new(0, 200, 0, 40)
+    FarmButton.Position = UDim2.new(0.5, -100, 0, 50)
+    FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    FarmButton.Text = "AUTO EGG: DISATTIVATO"
+    FarmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    FarmButton.TextSize = 13
+    FarmButton.Font = Enum.Font.SourceSansBold
+    FarmButton.Parent = MainFrame
+
+    local ButtonCorner = Instance.new("UICorner")
+    ButtonCorner.CornerRadius = UDim.new(0, 8)
+    ButtonCorner.Parent = FarmButton
+
+    -- Info Filtro
+    local InfoStatus = Instance.new("TextLabel")
+    InfoStatus.Name = "InfoStatus"
+    InfoStatus.Size = UDim2.new(0, 200, 0, 30)
+    InfoStatus.Position = UDim2.new(0.5, -100, 0, 105)
+    InfoStatus.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    InfoStatus.Text = "💎 AUTO-SELL ATTIVO (KEEP 1%)"
+    InfoStatus.TextColor3 = Color3.fromRGB(100, 255, 255)
+    InfoStatus.TextSize = 11
+    InfoStatus.Font = Enum.Font.SourceSansBold
+    InfoStatus.Parent = MainFrame
+
+    local StatusCorner = Instance.new("UICorner")
+    StatusCorner.CornerRadius = UDim.new(0, 6)
+    StatusCorner.Parent = InfoStatus
+
+    FarmButton.MouseButton1Click:Connect(function()
+        _G.AutoEggAttivo = not _G.AutoEggAttivo
+        if _G.AutoEggAttivo then
+            FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+            FarmButton.Text = "AUTO EGG: ATTIVO 🥚⚡"
+            AvviaAutoEgg()
+        else
+            FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            FarmButton.Text = "AUTO EGG: DISATTIVATO"
+        end
+    end)
+end
+
+--===================================================================================
+-- ESECUZIONE
+--===================================================================================
+InizializzaAntiAFK()
+CreaInterfaccia()
+print("[SYSTEM] Muscle Legends Egg Module loaded successfully.")
