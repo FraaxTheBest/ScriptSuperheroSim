@@ -1,88 +1,77 @@
 --===================================================================================
--- TRIXADE REAL-TIME PACKET TRACER & SYSTEM ANALYZER (VERSIONE MUSCLE UPD)
--- INTERCETTA, REGISTRA E CREA IL FILTRO AUTOMATICO PRIMA E DOPO L'APERTURA NATIVA
+-- TRIXADE MUSCLE LEGENDS - INDUSTRIAL CRYSTAL AUTOFARM (PRO-VERSION)
+-- FIX INVOKESERVER CORRETTO + AUTO-SELL SELETTIVO + MINIMIZZA/CHIUDI
 --===================================================================================
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local LogService = game:GetService("LogService")
+local UserInputService = game:GetService("UserInputService")
 
 local lPlayer = Players.LocalPlayer
 local pGui = lPlayer:WaitForChild("PlayerGui")
 
-print("======================================================================")
-print("🚨 ATTIVAZIONE ULTRA MEGA TRACER ASINCRONO TRIXADE - IN ATTESA DI INPUT")
-print("======================================================================")
+local openCrystalRemote = ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("openCrystalRemote")
+local sellPetEvent = ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("sellPetEvent")
 
-_G.TracerAttivo = false
-local logCatturati = {}
+_G.AutoEggAttivo = false
+local CRYSTAL_NAME = "Industrial Crystal"
+local PET_DA_SALVARE = "Apex Overlord"
 
 --===================================================================================
--- SENSORI INVISIBILI (HOOK): SPIANO OGNI FUNZIONE PRIMA CHE ARRIVI AL SERVER
+-- ENGINE DI APERTURA E FILTRO VENDITA PET
 --===================================================================================
-local function AttivaSpiaTotale()
-    local rEvents = ReplicatedStorage:WaitForChild("rEvents", 10)
-    if not rEvents then print("[ERROR] Cartella rEvents non trovata!") return end
+local eggThreadAttivo = false
 
-    -- 1. SPIA L'APERTURA DELL'UOVO (RemoteFunction)
-    local openCrystal = rEvents:FindFirstChild("openCrystalRemote")
-    if openCrystal and openCrystal:IsA("RemoteFunction") then
-        local vecchioInvoke = openCrystal.InvokeServer
-        openCrystal.InvokeServer = function(self, ...)
-            local args = {...}
-            print("\n🚨 [SPIATO PRIMA DI APRIRE]: Il gioco sta chiamando openCrystalRemote!")
-            for i, v in ipairs(args) do
-                print("   -> Parametro #" .. tostring(i) .. ": " .. tostring(v) .. " | Tipo: " .. typeof(v))
-            end
-            return vecchioInvoke(self, unpack(args))
-        end
-    end
-
-    -- 2. SPIA LA VENDITA DEI PET (RemoteEvent)
-    local sellPet = rEvents:FindFirstChild("sellPetEvent")
-    if sellPet and sellPet:IsA("RemoteEvent") then
-        local vecchioFire = sellPet.FireServer
-        sellPet.FireServer = function(self, ...)
-            local args = {...}
-            print("\n💀 [SPIATO VENDITA PET]: Rilevato segnale di sellPetEvent!")
-            for i, v in ipairs(args) do
-                if typeof(v) == "Instance" then
-                    print("   -> Pet venduto: " .. tostring(v.Name) .. " | Percorso: " .. v:GetFullName())
-                else
-                    print("   -> Parametro Vendita #" .. tostring(i) .. ": " .. tostring(v) .. " | Tipo: " .. typeof(v))
+local function eseguiAutoEgg()
+    task.spawn(function()
+        print("[EGG CORE] Avvio ciclo d'acquisto sbloccato.")
+        while _G.AutoEggAttivo do
+            
+            -- FIX SINTASSI: Chiama il server con la s minuscola (InvokeServer)
+            local successo, risultato = pcall(function()
+                return openCrystalRemote:InvokeServer(CRYSTAL_NAME)
+            end)
+            
+            -- SCANSIONE CARTELLA PET (CORRETTA DENTRO LEADERSTATS)
+            local leaderstats = lPlayer:FindFirstChild("leaderstats")
+            local folderPet = leaderstats and leaderstats:FindFirstChild("Pets")
+            
+            if folderPet then
+                local listaPet = folderPet:GetChildren()
+                for i = 1, #listaPet do
+                    if not _G.AutoEggAttivo then break end
+                    local pet = listaPet[i]
+                    
+                    -- Se il nome NON è Apex Overlord, lo vende all'istante
+                    if pet.Name ~= PET_DA_SALVARE then
+                        pcall(function()
+                            sellPetEvent:FireServer(pet)
+                        end)
+                    else
+                        print("[MEGA DROP!] Apex Overlord trovato e salvato dal filtro!")
+                    end
                 end
             end
-            vecchioFire(self, unpack(args))
+            
+            -- Pausa fissa a frame per non far laggare BlueStacks
+            task.wait(0.2)
         end
-    end
+        eggThreadAttivo = false
+        print("[EGG CORE] Ciclo terminato.")
+    end)
+end
+
+function AvviaAutoEgg()
+    if eggThreadAttivo then return end
+    eggThreadAttivo = true
+    eseguiAutoEgg()
 end
 
 --===================================================================================
--- SCANNER DELLE MODIFICHE (CONTROLLO DOPO L'APERTURA NATIVA)
+-- CREAZIONE INTERFACCIA GRAFICA COMPATTA (CON DISCONNESSIONI SICURE)
 --===================================================================================
--- Monitora se appaiono nuovi pet nello zaino delle leaderstats o dell'omino
-local function ConfiguraScannerDopo()
-    local targetPets = lPlayer:FindFirstChild("Pets") or (lPlayer:FindFirstChild("leaderstats") and lPlayer.leaderstats:FindFirstChild("Pets"))
-    if targetPets then
-        print("[TRACER] Sensore di controllo 'DOPO' agganciato alla cartella: " .. targetPets:GetFullName())
-        targetPets.ChildAdded:Connect(function(nuovoPet)
-            print("\n✨ [REGISTRATO DOPO L'APERTURA]: Un nuovo Pet è entrato nell'inventario!")
-            print("   * Nome Pet Rilevato: " .. tostring(nuovoPet.Name))
-            print("   * Verifico proprietà interne del modello:")
-            for _, prop in ipairs(nuovoPet:GetChildren()) do
-                print("     - Sotto-valore: " .. prop.Name .. " = " .. tostring(prop))
-            end
-        end)
-    else
-        warn("[WARNING] Impossibile trovare la cartella Pets! Apri un uovo a mano per farla caricare al gioco.")
-    end
-end
-
---===================================================================================
--- CREAZIONE INTERFACCIA GRAFICA REGISTRATORE (CON MINIMIZZA E CHIUDI)
---===================================================================================
-local function CreaInterfacciaTracer()
-    local screenName = "Trixade_MegaTracer_Gui"
+local function CreaInterfaccia()
+    local screenName = "MuscleLegends_Egg_Gui"
     local vecchioScreen = pGui:FindFirstChild(screenName)
     if vecchioScreen then vecchioScreen:Destroy() end
 
@@ -93,9 +82,9 @@ local function CreaInterfacciaTracer()
 
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 260, 0, 180)
-    MainFrame.Position = UDim2.new(0.5, -130, 0.4, -90)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(25, 35, 30)
+    MainFrame.Size = UDim2.new(0, 240, 0, 160)
+    MainFrame.Position = UDim2.new(0.5, -120, 0.4, -80)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.Parent = ScreenGui
@@ -107,9 +96,9 @@ local function CreaInterfacciaTracer()
     local Title = Instance.new("TextLabel")
     Title.Name = "Title"
     Title.Size = UDim2.new(1, 0, 0, 35)
-    Title.BackgroundColor3 = Color3.fromRGB(35, 45, 40)
-    Title.Text = "⚡ ULTRA TRACER ENGINE"
-    Title.TextColor3 = Color3.fromRGB(50, 255, 50)
+    Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    Title.Text = "TRIXADE EGG MANAGER"
+    Title.TextColor3 = Color3.fromRGB(255, 215, 0)
     Title.TextSize = 13
     Title.Font = Enum.Font.SourceSansBold
     Title.Parent = MainFrame
@@ -118,12 +107,34 @@ local function CreaInterfacciaTracer()
     TitleCorner.CornerRadius = UDim.new(0, 10)
     TitleCorner.Parent = Title
 
+    -- Drag Touch Mobile Delta Fix
+    local dragging, dragInput, dragStart, startPos
+    Title.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = MainFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    Title.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    local dragConnection = UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging and MainFrame.Parent then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
     local FarmButton = Instance.new("TextButton")
     FarmButton.Name = "FarmButton"
-    FarmButton.Size = UDim2.new(0, 220, 0, 42)
-    FarmButton.Position = UDim2.new(0.5, -110, 0, 55)
+    FarmButton.Size = UDim2.new(0, 200, 0, 40)
+    FarmButton.Position = UDim2.new(0.5, -100, 0, 50)
     FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    FarmButton.Text = "REGISTRATORE: SPENTO"
+    FarmButton.Text = "AUTO EGG: DISATTIVATO"
     FarmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     FarmButton.TextSize = 13
     FarmButton.Font = Enum.Font.SourceSansBold
@@ -135,13 +146,13 @@ local function CreaInterfacciaTracer()
 
     local InfoStatus = Instance.new("TextLabel")
     InfoStatus.Name = "InfoStatus"
-    InfoStatus.Size = UDim2.new(0, 220, 0, 45)
-    InfoStatus.Position = UDim2.new(0.5, -110, 0, 110)
-    InfoStatus.BackgroundColor3 = Color3.fromRGB(35, 45, 40)
-    InfoStatus.Text = "Premi il tasto sopra, vai al\ncristallo e compralo 1 volta a mano!"
-    InfoStatus.TextColor3 = Color3.fromRGB(200, 250, 200)
+    InfoStatus.Size = UDim2.new(0, 200, 0, 30)
+    InfoStatus.Position = UDim2.new(0.5, -100, 0, 105)
+    InfoStatus.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    InfoStatus.Text = "💎 KEEP: APEX OVERLORD ONLY"
+    InfoStatus.TextColor3 = Color3.fromRGB(100, 255, 255)
     InfoStatus.TextSize = 11
-    InfoStatus.Font = Enum.Font.SourceSans
+    InfoStatus.Font = Enum.Font.SourceSansBold
     InfoStatus.Parent = MainFrame
 
     local StatusCorner = Instance.new("UICorner")
@@ -149,21 +160,18 @@ local function CreaInterfacciaTracer()
     StatusCorner.Parent = InfoStatus
 
     FarmButton.MouseButton1Click:Connect(function()
-        _G.TracerAttivo = not _G.TracerAttivo
-        if _G.TracerAttivo then
-            FarmButton.BackgroundColor3 = Color3.fromRGB(45, 180, 45)
-            FarmButton.Text = "REGISTRATORE: IN ASCOLTO..."
-            InfoStatus.Text = "Ora apri l'uovo a mano!\nI dati appariranno nella console F9"
-            AttivaSpiaTotale()
-            ConfiguraScannerDopo()
+        _G.AutoEggAttivo = not _G.AutoEggAttivo
+        if _G.AutoEggAttivo then
+            FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+            FarmButton.Text = "OPENING ACTIVE... 🥚⚡"
+            AvviaAutoEgg()
         else
             FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-            FarmButton.Text = "REGISTRATORE: SPENTO"
-            InfoStatus.Text = "Premi il tasto sopra, vai al\ncristallo e compralo 1 volta a mano!"
+            FarmButton.Text = "AUTO EGG: DISATTIVATO"
         end
     end)
 
-    -- CONTROLLO MINIMIZZA
+    -- CONTROLLO MINIMIZZA (— / +)
     local minimized = false
     local MinButton = Instance.new("TextButton")
     MinButton.Name = "MinButton"
@@ -180,7 +188,7 @@ local function CreaInterfacciaTracer()
     MinCorner.CornerRadius = UDim.new(0, 5)
     MinCorner.Parent = MinButton
 
-    -- CONTROLLO CHIUDI
+    -- CONTROLLO CHIUDI (×)
     local CloseButton = Instance.new("TextButton")
     CloseButton.Name = "CloseButton"
     CloseButton.Size = UDim2.new(0, 26, 0, 22)
@@ -201,21 +209,22 @@ local function CreaInterfacciaTracer()
     MinButton.MouseButton1Click:Connect(function()
         minimized = not minimized
         if minimized then
-            MainFrame.Size = UDim2.new(0, 260, 0, 35)
+            MainFrame.Size = UDim2.new(0, 240, 0, 35)
             for i = 1, #content do content[i].Visible = false end
             MinButton.Text = "+"
         else
-            MainFrame.Size = UDim2.new(0, 260, 0, 180)
+            MainFrame.Size = UDim2.new(0, 240, 0, 160)
             for i = 1, #content do content[i].Visible = true end
             MinButton.Text = "—"
         end
     end)
 
     CloseButton.MouseButton1Click:Connect(function()
-        _G.TracerAttivo = false
+        _G.AutoEggAttivo = false
+        pcall(function() if dragConnection then dragConnection:Disconnect() end end)
         ScreenGui:Destroy()
-        print("[TRACER] Registratore rimosso.")
+        print("[GUI] Chiusura completata.")
     end)
 end
 
-CreaInterfacciaTracer()
+CreaInterfaccia()
