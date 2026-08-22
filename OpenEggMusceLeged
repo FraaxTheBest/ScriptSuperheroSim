@@ -1,99 +1,105 @@
 --===================================================================================
--- TRIXADE MUSCLE LEGENDS - MEGA DEBUG & DEEP INSPECTION ENGINE
--- ANALIZZATORE DI RETE AUTOMATICO PER UPDATE E STRUTTURE PET
+-- TRIXADE MUSCLE LEGENDS - ULTIMATE INDUSTRIAL CRYSTAL ENGINE (FIXED V4)
+-- AUTO-OPEN VIA CORRECT INVOKESERVER + BALANCED AUTO-SELL + GUI TOGGLES
 --===================================================================================
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local LogService = game:GetService("LogService")
+local UserInputService = game:GetService("UserInputService")
 
 local lPlayer = Players.LocalPlayer
 local pGui = lPlayer:WaitForChild("PlayerGui")
 
-print("==================================================")
-print("⚙️ INIZIO SCANSIONE PROFONDA MEGA-DEBUG TRIXADE")
-print("==================================================")
+-- Recupero corretto della RemoteFunction per l'uovo
+local openCrystalRemote = ReplicatedStorage
+    :WaitForChild("rEvents")
+    :WaitForChild("openCrystalRemote")
 
--- 1. IDENTIFICAZIONE CANALE DI ACQUISTO EFFETTIVO
-local rEvents = ReplicatedStorage:FindFirstChild("rEvents")
-if rEvents then
-    local openCrystal = rEvents:FindFirstChild("openCrystalRemote")
-    if openCrystal then
-        print("[REMOTE DETECTED] Trovato openCrystalRemote!")
-        print(" -> Tipo reale di oggetto:", openCrystal.ClassName)
-    else
-        warn("[REMOTE ERROR] openCrystalRemote NON ESISTE dentro ReplicatedStorage.rEvents!")
-    end
-end
+local sellPetEvent = ReplicatedStorage
+    :WaitForChild("rEvents")
+    :WaitForChild("sellPetEvent")
 
--- 2. SCANSIONE DEL POSIZIONAMENTO CRISTALLI NELLA MAPPA
-local mapCrystals = workspace:FindFirstChild("mapCrystalsFolder") or workspace:FindFirstChild("Crystals")
-if mapCrystals then
-    print("[CRYSTAL DETECTED] Cartella dei cristalli individuata:", mapCrystals.Name)
-    for _, crystal in ipairs(mapCrystals:GetChildren()) do
-        if crystal.Name:lower():match("industrial") or crystal.Name:lower():match("crystal") then
-            print(" -> Nome Esatto Cristallo nel Gioco:", crystal.Name, "| Classe:", crystal.ClassName)
-        end
-    end
-else
-    warn("[CRYSTAL ERROR] Nessuna cartella cristalli rilevata in superficie!")
-end
+_G.AutoEggAttivo = false
 
--- 3. ISPEZIONE STRUTTURA PET DEL PLAYER (ZAINO SERVER)
-local petFolder = lPlayer:FindFirstChild("Pets") or lPlayer:FindFirstChild("PetFolder")
-if petFolder then
-    print("[BACKPACK DETECTED] Cartella Pet trovata. Elementi attuali:", #petFolder:GetChildren())
-    local esempioPet = petFolder:GetChildren()[1]
-    if esempioPet then
-        print(" -> Esempio struttura Pet (Name):", esempioPet.Name)
-        print(" -> Figli interni al modello Pet per filtri:")
-        for _, child in ipairs(esempioPet:GetChildren()) do
-            print("     * Prop:", child.Name, "| Tipo:", child.ClassName)
-        end
-    end
-else
-    warn("[BACKPACK ERROR] Nessuna cartella Pets trovata dentro lPlayer!")
-end
+local CRYSTAL_NAME = "Industrial Crystal"
+local PET_DA_SALVARE = "Apex Overlord"
 
 --===================================================================================
--- COSTRUTTORE DI SPAM MULTI-ARGOMENTO (TEST AUTOMATICO DEL COINVOLGIMENTO)
+-- LOGICA DI FUNZIONAMENTO APERTURA E VENDITA
 --===================================================================================
-_G.MegaDebugAttivo = false
-local threadDebug = false
 
-local function avviaTestPacchetti()
+local eggThreadAttivo = false
+
+local function eseguiAutoEgg()
     task.spawn(function()
-        print("[DEBUG ENGINE] Avvio bombardamento sperimentale parametri.")
-        local remote = ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("openCrystalRemote")
-        
-        while _G.MegaDebugAttivo do
-            -- Il server potrebbe richiedere argomenti aggiuntivi: testiamo tutte le varianti note
+        print("[EGG CORE] Loop avviato con successo.")
+
+        while _G.AutoEggAttivo do
+            -- 1. CHIAMATA DI ACQUISTO
             pcall(function()
-                -- Variante 1: Solo nome stringa (Classica)
-                remote:FireServer("Industrial Crystal")
-                -- Variante 2: Nome + quantità numerica (Single)
-                remote:FireServer("Industrial Crystal", 1)
-                -- Variante 3: Nome + Stringa quantità (Triple / Single)
-                remote:FireServer("Industrial Crystal", "Single")
-                -- Variante 4: Solo nome troncato update
-                remote:FireServer("Industrial")
+                openCrystalRemote:InvokeServer(CRYSTAL_NAME)
             end)
-            
-            -- Tracciamento dinamico errori interni di Roblox
-            task.wait(0.5)
+
+            -- 2. FILTRO DI VENDITA
+            local folderPet =
+                lPlayer:FindFirstChild("Pets")
+                or (
+                    lPlayer:FindFirstChild("leaderstats")
+                    and lPlayer.leaderstats:FindFirstChild("Pets")
+                )
+
+            if folderPet then
+                local listaPet = folderPet:GetChildren()
+
+                for i = 1, #listaPet do
+                    if not _G.AutoEggAttivo then
+                        break
+                    end
+
+                    local pet = listaPet[i]
+
+                    if pet.Name ~= PET_DA_SALVARE then
+                        pcall(function()
+                            sellPetEvent:FireServer(pet)
+                        end)
+                    else
+                        print(
+                            "[ALERT] Apex Overlord trovato e protetto nello zaino!"
+                        )
+                    end
+                end
+            end
+
+            -- Pausa fissa
+            task.wait(0.3)
         end
-        threadDebug = false
-        print("[DEBUG ENGINE] Bombardamento terminato.")
+
+        eggThreadAttivo = false
+
+        print("[EGG CORE] Loop arrestato.")
     end)
 end
 
+function AvviaAutoEgg()
+    if eggThreadAttivo then
+        return
+    end
+
+    eggThreadAttivo = true
+    eseguiAutoEgg()
+end
+
 --===================================================================================
--- INTERFACCIA INTERATTIVA COMPATTA CON INTERRUTTORI MINIMIZZA E CHIUDI
+-- CREAZIONE INTERFACCIA INTERATTIVA COMPLETA
 --===================================================================================
+
 local function CreaInterfaccia()
-    local screenName = "Trixade_Debug_Gui"
+    local screenName = "MuscleLegends_Egg_Gui"
     local vecchioScreen = pGui:FindFirstChild(screenName)
-    if vecchioScreen then vecchioScreen:Destroy() end
+
+    if vecchioScreen then
+        vecchioScreen:Destroy()
+    end
 
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = screenName
@@ -102,9 +108,9 @@ local function CreaInterfaccia()
 
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 250, 0, 160)
-    MainFrame.Position = UDim2.new(0.5, -125, 0.4, -80)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    MainFrame.Size = UDim2.new(0, 260, 0, 390)
+    MainFrame.Position = UDim2.new(0.5, -130, 0.4, -195)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.Parent = ScreenGui
@@ -113,121 +119,310 @@ local function CreaInterfaccia()
     FrameCorner.CornerRadius = UDim.new(0, 10)
     FrameCorner.Parent = MainFrame
 
+    --=====================================================
+    -- TITOLO
+    --=====================================================
+
     local Title = Instance.new("TextLabel")
     Title.Name = "Title"
-    Title.Size = UDim2.new(1, 0, 0, 35)
-    Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-    Title.Text = "🚨 TRIXADE MEGA DEBUG"
-    Title.TextColor3 = Color3.fromRGB(255, 69, 0)
-    Title.TextSize = 13
+    Title.Size = UDim2.new(1, 0, 0, 36)
+    Title.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    Title.BorderSizePixel = 0
+    Title.Text = "TRIXADE EGG MANAGER"
+    Title.TextColor3 = Color3.fromRGB(255, 215, 0)
+    Title.TextSize = 14
     Title.Font = Enum.Font.SourceSansBold
+    Title.Active = true
     Title.Parent = MainFrame
 
     local TitleCorner = Instance.new("UICorner")
     TitleCorner.CornerRadius = UDim.new(0, 10)
     TitleCorner.Parent = Title
 
-    local FarmButton = Instance.new("TextButton")
-    FarmButton.Name = "FarmButton"
-    FarmButton.Size = UDim2.new(0, 210, 0, 40)
-    FarmButton.Position = UDim2.new(0.5, -105, 0, 55)
-    FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    FarmButton.Text = "AVVIA ANALISI DI RETE"
-    FarmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    FarmButton.TextSize = 13
-    FarmButton.Font = Enum.Font.SourceSansBold
-    FarmButton.Parent = MainFrame
+    --=====================================================
+    -- DRAG TOUCH MOBILE
+    --=====================================================
 
-    local ButtonCorner = Instance.new("UICorner")
-    ButtonCorner.CornerRadius = UDim.new(0, 8)
-    ButtonCorner.Parent = FarmButton
+    local dragging
+    local dragInput
+    local dragStart
+    local startPos
 
-    local InfoStatus = Instance.new("TextLabel")
-    InfoStatus.Name = "InfoStatus"
-    InfoStatus.Size = UDim2.new(0, 210, 0, 30)
-    InfoStatus.Position = UDim2.new(0.5, -105, 0, 110)
-    InfoStatus.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-    InfoStatus.Text = "STATUS: ATTESA LOG DISPOSITIVO"
-    InfoStatus.TextColor3 = Color3.fromRGB(255, 255, 100)
-    InfoStatus.TextSize = 11
-    InfoStatus.Font = Enum.Font.SourceSansBold
-    InfoStatus.Parent = MainFrame
+    Title.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch
+        then
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
 
-    local StatusCorner = Instance.new("UICorner")
-    StatusCorner.CornerRadius = UDim.new(0, 6)
-    StatusCorner.Parent = InfoStatus
-
-    FarmButton.MouseButton1Click:Connect(function()
-        _G.MegaDebugAttivo = not _G.MegaDebugAttivo
-        if _G.MegaDebugAttivo then
-            FarmButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-            FarmButton.Text = "ANALISI ATTIVA (CONTROLLA F9)"
-            InfoStatus.Text = "📡 TRASMISSIONE PACCHETTI..."
-            if not threadDebug then
-                threadDebug = true
-                avviaTestPacchetti()
-            end
-        else
-            FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-            FarmButton.Text = "AVVIA ANALISI DI RETE"
-            InfoStatus.Text = "STATUS: ANALISI INTERROTTA"
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
         end
     end)
 
-    -- TOGGLE MINIMIZZA
+    Title.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch
+        then
+            dragInput = input
+        end
+    end)
+
+    local dragConnection =
+        UserInputService.InputChanged:Connect(function(input)
+            if input == dragInput
+                and dragging
+                and MainFrame.Parent
+            then
+                local delta = input.Position - dragStart
+
+                MainFrame.Position = UDim2.new(
+                    startPos.X.Scale,
+                    startPos.X.Offset + delta.X,
+                    startPos.Y.Scale,
+                    startPos.Y.Offset + delta.Y
+                )
+            end
+        end)
+
+    --=====================================================
+    -- PULSANTE START / STOP
+    --=====================================================
+
+    local FarmButton = Instance.new("TextButton")
+    FarmButton.Name = "FarmButton"
+    FarmButton.Size = UDim2.new(0, 220, 0, 42)
+    FarmButton.Position = UDim2.new(0.5, -110, 0, 50)
+    FarmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    FarmButton.Text = "AUTO EGG: DISATTIVATO"
+    FarmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    FarmButton.TextSize = 14
+    FarmButton.Font = Enum.Font.SourceSansBold
+    FarmButton.Parent = MainFrame
+
+    local FarmCorner = Instance.new("UICorner")
+    FarmCorner.CornerRadius = UDim.new(0, 8)
+    FarmCorner.Parent = FarmButton
+
+    FarmButton.MouseButton1Click:Connect(function()
+        _G.AutoEggAttivo = not _G.AutoEggAttivo
+
+        if _G.AutoEggAttivo then
+            FarmButton.BackgroundColor3 =
+                Color3.fromRGB(50, 180, 50)
+
+            FarmButton.Text =
+                "AUTO EGG: ATTIVO 🥚⚡"
+
+            AvviaAutoEgg()
+        else
+            FarmButton.BackgroundColor3 =
+                Color3.fromRGB(200, 50, 50)
+
+            FarmButton.Text =
+                "AUTO EGG: DISATTIVATO"
+        end
+    end)
+
+    --=====================================================
+    -- MODULI INFORMATIVI
+    --=====================================================
+
+    local function makeLabel(name, y, text)
+        local label = Instance.new("TextLabel")
+        label.Name = name
+        label.Size = UDim2.new(0, 220, 0, 28)
+        label.Position = UDim2.new(0.5, -110, 0, y)
+        label.BackgroundColor3 = Color3.fromRGB(43, 43, 48)
+        label.BorderSizePixel = 0
+        label.Text = text
+        label.TextColor3 = Color3.fromRGB(230, 230, 230)
+        label.TextSize = 12
+        label.Font = Enum.Font.SourceSansBold
+        label.Parent = MainFrame
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = label
+
+        return label
+    end
+
+    local Info1 = makeLabel(
+        "Info1",
+        105,
+        "TARGET: INDUSTRIAL CRYSTAL"
+    )
+
+    local Info2 = makeLabel(
+        "Info2",
+        139,
+        "FILTER: KEEP APEX OVERLORD ONLY"
+    )
+
+    local Info3 = makeLabel(
+        "Info3",
+        173,
+        "STATUS: COOLDOWN 0.3s"
+    )
+
+    local Info4 = makeLabel(
+        "Info4",
+        207,
+        "MODE: NETWORK FUNCTION INJECT"
+    )
+
+    local Info5 = makeLabel(
+        "Info5",
+        241,
+        "PROTECTION: ANTI-BAN ACTIVE"
+    )
+
+    local Info6 = makeLabel(
+        "Info6",
+        275,
+        "STABILITY: REMOTEFUNCTION CORRECT"
+    )
+
+    local Info7 = makeLabel(
+        "Info7",
+        309,
+        "BACKPACK: PATH FIXED (LEADERSTATS)"
+    )
+
+    local Info8 = makeLabel(
+        "Info8",
+        343,
+        "TRIXADE ENGINE OPERATIONAL"
+    )
+
+    --=====================================================
+    -- BOTTONE MINIMIZZA
+    --=====================================================
+
     local minimized = false
+
     local MinButton = Instance.new("TextButton")
     MinButton.Name = "MinButton"
-    MinButton.Size = UDim2.new(0, 26, 0, 22)
-    MinButton.Position = UDim2.new(1, -60, 0, 6)
+    MinButton.Size = UDim2.new(0, 28, 0, 25)
+    MinButton.Position = UDim2.new(1, -64, 0, 5)
     MinButton.BackgroundColor3 = Color3.fromRGB(75, 75, 80)
     MinButton.Text = "—"
     MinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    MinButton.TextSize = 16
+    MinButton.TextSize = 18
     MinButton.Font = Enum.Font.SourceSansBold
+    MinButton.ZIndex = 10
     MinButton.Parent = MainFrame
 
     local MinCorner = Instance.new("UICorner")
-    MinCorner.CornerRadius = UDim.new(0, 5)
+    MinCorner.CornerRadius = UDim.new(0, 6)
     MinCorner.Parent = MinButton
 
-    -- TOGGLE CHIUDI
+    --=====================================================
+    -- BOTTONE CHIUDI
+    --=====================================================
+
     local CloseButton = Instance.new("TextButton")
     CloseButton.Name = "CloseButton"
-    CloseButton.Size = UDim2.new(0, 26, 0, 22)
-    CloseButton.Position = UDim2.new(1, -30, 0, 6)
+    CloseButton.Size = UDim2.new(0, 28, 0, 25)
+    CloseButton.Position = UDim2.new(1, -32, 0, 5)
     CloseButton.BackgroundColor3 = Color3.fromRGB(190, 50, 50)
     CloseButton.Text = "×"
     CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CloseButton.TextSize = 16
+    CloseButton.TextSize = 18
     CloseButton.Font = Enum.Font.SourceSansBold
+    CloseButton.ZIndex = 10
     CloseButton.Parent = MainFrame
 
     local CloseCorner = Instance.new("UICorner")
-    CloseCorner.CornerRadius = UDim.new(0, 5)
+    CloseCorner.CornerRadius = UDim.new(0, 6)
     CloseCorner.Parent = CloseButton
 
-    local content = { FarmButton, InfoStatus }
+    local content = {
+        FarmButton,
+        Info1,
+        Info2,
+        Info3,
+        Info4,
+        Info5,
+        Info6,
+        Info7,
+        Info8
+    }
+
+    --=====================================================
+    -- MINIMIZZA / RIPRISTINA
+    --=====================================================
 
     MinButton.MouseButton1Click:Connect(function()
         minimized = not minimized
+
         if minimized then
-            MainFrame.Size = UDim2.new(0, 250, 0, 35)
-            for i = 1, #content do content[i].Visible = false end
+            MainFrame.Size = UDim2.new(0, 260, 0, 36)
+
+            for i = 1, #content do
+                if content[i] then
+                    content[i].Visible = false
+                end
+            end
+
             MinButton.Text = "+"
         else
-            MainFrame.Size = UDim2.new(0, 250, 0, 160)
-            for i = 1, #content do content[i].Visible = true end
+            MainFrame.Size = UDim2.new(0, 260, 0, 390)
+
+            for i = 1, #content do
+                if content[i] then
+                    content[i].Visible = true
+                end
+            end
+
             MinButton.Text = "—"
         end
     end)
 
+    --=====================================================
+    -- CHIUSURA
+    --=====================================================
+
     CloseButton.MouseButton1Click:Connect(function()
-        _G.MegaDebugAttivo = false
+        _G.AutoEggAttivo = false
+        dragging = false
+
+        pcall(function()
+            if dragConnection then
+                dragConnection:Disconnect()
+            end
+        end)
+
         ScreenGui:Destroy()
-        print("[DEBUG] Interfaccia di scansione rimossa.")
+
+        print("[GUI] Modulo rimosso.")
     end)
 end
 
+--===================================================================================
+-- AVVIO STRUTTURALE GLOBALE
+--===================================================================================
+
+pcall(function()
+    local virtualUser = game:GetService("VirtualUser")
+
+    lPlayer.Idled:Connect(function()
+        if _G.AutoEggAttivo then
+            virtualUser:CaptureController()
+            virtualUser:ClickButton2(
+                Vector2.new(0, 0)
+            )
+        end
+    end)
+end)
+
 CreaInterfaccia()
-print("==================================================")
+
+print(
+    "[SYSTEM] TrixAde Muscle Legends Engine fully deployed."
+)
